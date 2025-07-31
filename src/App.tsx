@@ -1,12 +1,12 @@
 import { useState } from 'react'
 import { Button } from './components/ui/button'
 import './App.css'
-import UserRegistration from './components/UserRegistration'
+import UserLogin from './components/UserLogin'
 
 function App() {
 
   return (
-    <UserRegistration/>
+    <UserLogin/>
   )
 }
 

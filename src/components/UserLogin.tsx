@@ -6,12 +6,7 @@ import { Button } from "@/components/ui/button"
 export default function UserRegistration() {
   return (
     <div className="flex items-center justify-center min-h-screen p-4 rounded-xl">
-      <Card className="w-1/2 shadow-xl">
-        <CardHeader>
-          <CardTitle className="text-2xl font-bold">
-            Account Registration
-          </CardTitle>
-        </CardHeader>
+      <Card className="w-1/4 shadow-xl">
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="username">
@@ -23,27 +18,17 @@ export default function UserRegistration() {
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="email">
-              Email
-            </Label>
-            <Input
-              type="email"
-              id="email"
-              placeholder="you@example.com"
-            />
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="password">
               Password
             </Label>
             <Input
               type="password"
               id="password"
-              placeholder="pick a password with lower and upper case characters, numbers, and symbols"
+              placeholder="your password"
             />
           </div>
           <Button className="w-full" onClick={() => alert('Button clicked!')}>
-            Register
+            Login
           </Button>
         </CardContent>
       </Card>
