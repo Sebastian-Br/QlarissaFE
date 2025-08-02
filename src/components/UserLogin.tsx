@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+
 import { useNavigate } from "react-router-dom"
 
 export default function UserRegistration() {
@@ -25,12 +26,9 @@ export default function UserRegistration() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">
-              Password
+            Password
             </Label>
-            <Input
-              type="password"
-              id="password"
-              placeholder="your password"
+            <Input type="password" id="password" placeholder="your password"
             />
           </div>
           <Button className="w-full" onClick={() => alert('Button clicked!')}>
