@@ -1,12 +1,30 @@
+import { useNavigate } from "react-router-dom"
+import { useState } from "react"
+import { loginAsUser } from "@/api/accountApi"
+
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 
-import { useNavigate } from "react-router-dom"
-
 export default function UserRegistration() {
-  let navigate = useNavigate();
+  let navigate = useNavigate()
+
+  const [username, setUsername] = useState("")
+  const [password, setPassword] = useState("")
+  const [error, setError] = useState<string | null>(null)
+
+  async function handleLogin() {
+      const res = await loginAsUser({ username, password })
+      if (res.ok) {
+        const token = await res.text();
+        localStorage.setItem("jwt", token);
+        navigate("/dashboard")
+      } else {
+        const errorText = await res.text()
+        setError(errorText || "Login failed")
+      }
+    }
 
   return (
     <div className="flex items-center justify-center min-h-screen p-4 rounded-xl">
@@ -19,19 +37,16 @@ export default function UserRegistration() {
             <Label htmlFor="username">
               Username
             </Label>
-            <Input
-              id="username"
-              placeholder="your username"
-            />
+            <Input id="username" placeholder="your username" onChange={e => setUsername(e.target.value)}/>
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">
             Password
             </Label>
-            <Input type="password" id="password" placeholder="your password"
-            />
+            <Input type="password" id="password" placeholder="your password" onChange={e => setPassword(e.target.value)}/>
           </div>
-          <Button className="w-full" onClick={() => alert('Button clicked!')}>
+          {error && <p className="text-sm text-red-500">{error}</p>}
+          <Button className="w-full" onClick={handleLogin}>
             Login
           </Button>
         </CardContent>
