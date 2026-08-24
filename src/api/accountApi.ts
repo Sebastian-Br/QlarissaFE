@@ -6,18 +6,26 @@ const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export const USERNAME_AVAILABILITY_ENDPOINT = "/api/Account/CheckUsernameAvailability";
 export const EMAIL_AVAILABILITY_ENDPOINT = "/api/Account/CheckEmailAvailability";
 
-export function checkUsernameAvailability(username: string, signal?: AbortSignal): Promise<Response> {
-  return fetch(`${BASE_URL}${USERNAME_AVAILABILITY_ENDPOINT}?username=${encodeURIComponent(username)}`, {
-    signal,
-    headers: { accept: "*/*" },
-  });
+export interface AvailabilityResponse {
+  available: boolean;
 }
 
-export function checkEmailAvailability(email: string, signal?: AbortSignal): Promise<Response> {
-  return fetch(`${BASE_URL}${EMAIL_AVAILABILITY_ENDPOINT}?email=${encodeURIComponent(email)}`, {
+export async function checkUsernameAvailability(username: string, signal?: AbortSignal): Promise<AvailabilityResponse> {
+  const response = await fetch(`${BASE_URL}${USERNAME_AVAILABILITY_ENDPOINT}?username=${encodeURIComponent(username)}`, {
     signal,
     headers: { accept: "*/*" },
   });
+
+  return response.json();
+}
+
+export async function checkEmailAvailability(email: string, signal?: AbortSignal): Promise<AvailabilityResponse> {
+  const response = await fetch(`${BASE_URL}${EMAIL_AVAILABILITY_ENDPOINT}?email=${encodeURIComponent(email)}`, {
+    signal,
+    headers: { accept: "*/*" },
+  });
+
+  return response.json();
 }
 
 

@@ -18,6 +18,16 @@ import {
 
 const VALIDATION_DELAY_MS = 750
 
+const isValidUsername = (value: string) => /^[A-Za-z0-9]+$/.test(value)
+const isValidEmail = (value: string) => /^\S+@\S+\.\S+$/.test(value)
+const isValidPassword = (value: string) =>
+  value.length >= 6
+  && /[a-z]/.test(value)
+  && /[A-Z]/.test(value)
+  && /\d/.test(value)
+  && /[^A-Za-z0-9]/.test(value)
+  && new Set(value).size >= 2
+
 type FieldStatus = "idle" | "loading" | "available" | "unavailable" | "error"
 
 function StatusIndicator({ status }: { status: FieldStatus }) {
@@ -53,15 +63,15 @@ export default function UserRegistration() {
   const navigate = useNavigate()
 
   useEffect(() => {
-    const value = username.trim()
-    if (!value) return
+    const value = username
+    if (!isValidUsername(value)) return
 
     const controller = new AbortController()
     const timeout = window.setTimeout(async () => {
       setUsernameStatus("loading")
       try {
-        const response = await checkUsernameAvailability(value, controller.signal)
-        setUsernameStatus(response.ok ? "available" : "unavailable")
+        const { available } = await checkUsernameAvailability(value, controller.signal)
+        setUsernameStatus(available ? "available" : "unavailable")
       } catch (error) {
         if ((error as Error).name !== "AbortError") setUsernameStatus("error")
       }
@@ -75,14 +85,14 @@ export default function UserRegistration() {
 
   useEffect(() => {
     const value = email.trim()
-    if (!value || !/^\S+@\S+\.\S+$/.test(value)) return
+    if (!value || !isValidEmail(value)) return
 
     const controller = new AbortController()
     const timeout = window.setTimeout(async () => {
       setEmailStatus("loading")
       try {
-        const response = await checkEmailAvailability(value, controller.signal)
-        setEmailStatus(response.ok ? "available" : "unavailable")
+        const { available } = await checkEmailAvailability(value, controller.signal)
+        setEmailStatus(available ? "available" : "unavailable")
       } catch (error) {
         if ((error as Error).name !== "AbortError") setEmailStatus("error")
       }
@@ -98,15 +108,19 @@ export default function UserRegistration() {
     if (!password) return
 
     const timeout = window.setTimeout(() => {
-      const isValid = /[a-z]/.test(password)
-        && /[A-Z]/.test(password)
-        && /\d/.test(password)
-        && /[^A-Za-z0-9]/.test(password)
-      setPasswordStatus(isValid ? "available" : "unavailable")
+      setPasswordStatus(isValidPassword(password) ? "available" : "unavailable")
     }, VALIDATION_DELAY_MS)
 
     return () => window.clearTimeout(timeout)
   }, [password])
+
+  const validFieldCount = [
+    usernameStatus === "available",
+    emailStatus === "available",
+    passwordStatus === "available",
+  ].filter(Boolean).length
+  const progress = (validFieldCount / 3) * 100
+  const canRegister = validFieldCount === 3
 
   async function handleRegister() {
     const res = await registerUser({ username, email, password })
@@ -186,9 +200,29 @@ export default function UserRegistration() {
 
           {error && <p className="text-sm text-red-500" role="alert">{error}</p>}
 
-          <Button className="w-full" onClick={handleRegister}>
-            Register
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className={`block w-full ${canRegister ? "" : "cursor-not-allowed"}`}>
+                <Button
+                  className="relative w-full overflow-hidden disabled:cursor-not-allowed disabled:bg-slate-500 disabled:hover:bg-slate-500 disabled:opacity-100"
+                  onClick={handleRegister}
+                  disabled={!canRegister}
+                >
+                  <span
+                    className="absolute inset-y-0 left-0 bg-blue-600 transition-[width] duration-300"
+                    style={{ width: `${progress}%` }}
+                    aria-hidden="true"
+                  />
+                  <span className="relative">Register</span>
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!canRegister && (
+              <TooltipContent>
+                <span className="text-sm">Complete the required fields to register.</span>
+              </TooltipContent>
+            )}
+          </Tooltip>
         </CardContent>
       </Card>
     </div>
