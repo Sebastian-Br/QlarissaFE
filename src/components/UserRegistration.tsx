@@ -60,8 +60,8 @@ export default function UserRegistration() {
     const timeout = window.setTimeout(async () => {
       setUsernameStatus("loading")
       try {
-        const response = await checkUsernameAvailability(value, controller.signal)
-        setUsernameStatus(response.ok ? "available" : "unavailable")
+        const { available } = await checkUsernameAvailability(value, controller.signal)
+        setUsernameStatus(available ? "available" : "unavailable")
       } catch (error) {
         if ((error as Error).name !== "AbortError") setUsernameStatus("error")
       }
@@ -81,8 +81,8 @@ export default function UserRegistration() {
     const timeout = window.setTimeout(async () => {
       setEmailStatus("loading")
       try {
-        const response = await checkEmailAvailability(value, controller.signal)
-        setEmailStatus(response.ok ? "available" : "unavailable")
+        const { available } = await checkEmailAvailability(value, controller.signal)
+        setEmailStatus(available ? "available" : "unavailable")
       } catch (error) {
         if ((error as Error).name !== "AbortError") setEmailStatus("error")
       }
