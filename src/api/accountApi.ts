@@ -2,6 +2,25 @@ import type { RegisterUserRequest } from "../models/RegisterUserRequest";
 import type { UserLoginRequest } from "../models/UserLoginRequest";
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
+// Replace these paths with the backend availability endpoints when they are available.
+export const USERNAME_AVAILABILITY_ENDPOINT = "/api/Account/CheckUsernameAvailability";
+export const EMAIL_AVAILABILITY_ENDPOINT = "/api/Account/CheckEmailAvailability";
+
+export function checkUsernameAvailability(username: string, signal?: AbortSignal): Promise<Response> {
+  return fetch(`${BASE_URL}${USERNAME_AVAILABILITY_ENDPOINT}?username=${encodeURIComponent(username)}`, {
+    signal,
+    headers: { accept: "*/*" },
+  });
+}
+
+export function checkEmailAvailability(email: string, signal?: AbortSignal): Promise<Response> {
+  return fetch(`${BASE_URL}${EMAIL_AVAILABILITY_ENDPOINT}?email=${encodeURIComponent(email)}`, {
+    signal,
+    headers: { accept: "*/*" },
+  });
+}
+
+
 export async function registerUser(data: RegisterUserRequest): Promise<Response> {
   let result = fetch(`${BASE_URL}/api/Account/Register`, {
   method: "POST",
