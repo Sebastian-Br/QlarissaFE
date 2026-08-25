@@ -10,6 +10,8 @@ import {
   checkUsernameAvailability,
   registerUser,
 } from "@/api/accountApi"
+import { getCurrencies } from "@/api/currencyApi"
+import type { Currency } from "@/models/Currency"
 import {
   Tooltip,
   TooltipContent,
@@ -55,12 +57,27 @@ export default function UserRegistration() {
   const [username, setUsername] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [displayCurrencyId, setDisplayCurrencyId] = useState<number | null>(null)
+  const [currencies, setCurrencies] = useState<Currency[]>([])
+  const [currencyError, setCurrencyError] = useState<string | null>(null)
   const [usernameStatus, setUsernameStatus] = useState<FieldStatus>("idle")
   const [emailStatus, setEmailStatus] = useState<FieldStatus>("idle")
   const [passwordStatus, setPasswordStatus] = useState<FieldStatus>("idle")
   const [error, setError] = useState<string | null>(null)
 
   const navigate = useNavigate()
+
+  useEffect(() => {
+    const controller = new AbortController()
+
+    getCurrencies(controller.signal)
+      .then(setCurrencies)
+      .catch(error => {
+        if ((error as Error).name !== "AbortError") setCurrencyError("We could not load display currencies.")
+      })
+
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     const value = username
@@ -118,12 +135,20 @@ export default function UserRegistration() {
     usernameStatus === "available",
     emailStatus === "available",
     passwordStatus === "available",
+    displayCurrencyId !== null,
   ].filter(Boolean).length
-  const progress = (validFieldCount / 3) * 100
-  const canRegister = validFieldCount === 3
+  const progress = (validFieldCount / 4) * 100
+  const canRegister = validFieldCount === 4
 
   async function handleRegister() {
-    const res = await registerUser({ username, email, password })
+    if (displayCurrencyId === null) return
+
+    const res = await registerUser({
+      Username: username,
+      Email: email,
+      DisplayCurrencyId: displayCurrencyId,
+      Password: password,
+    })
     if (res.ok) {
       navigate("/login")
     } else {
@@ -179,6 +204,31 @@ export default function UserRegistration() {
             </div>
             {emailStatus === "unavailable" && <p className="text-sm text-red-300" role="alert">An account already uses this email address.</p>}
             {emailStatus === "error" && <p className="text-sm text-red-300" role="alert">We could not check this email address.</p>}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="display-currency">Display Currency</Label>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div>
+                  <select
+                    id="display-currency"
+                    value={displayCurrencyId ?? ""}
+                    onChange={event => setDisplayCurrencyId(Number(event.target.value))}
+                    className={`border-input bg-transparent [&>option]:bg-background [&>option]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 ${displayCurrencyId === null ? "text-muted-foreground opacity-70" : "text-foreground"}`}
+                    disabled={currencies.length === 0}
+                  >
+                    <option value="" disabled>select a currency</option>
+                    {currencies.map(currency => (
+                      <option key={currency.id} value={currency.id}>{currency.name} ({currency.symbol})</option>
+                    ))}
+                  </select>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent className="opacity-90">
+                <span className="text-sm">This is the currency in which the total value of your assets will be displayed.</span>
+              </TooltipContent>
+            </Tooltip>
+            {currencyError && <p className="text-sm text-red-300" role="alert">{currencyError}</p>}
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
