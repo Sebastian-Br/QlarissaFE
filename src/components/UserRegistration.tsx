@@ -219,7 +219,7 @@ export default function UserRegistration() {
                   >
                     <option value="" disabled>Select a currency</option>
                     {currencies.map(currency => (
-                      <option key={currency.Id} value={currency.Id}>{currency.Symbol} — {currency.Name}</option>
+                      <option key={currency.id} value={currency.id}>{currency.symbol} — {currency.name}</option>
                     ))}
                   </select>
                 </div>
