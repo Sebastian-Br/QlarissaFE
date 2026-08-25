@@ -214,7 +214,7 @@ export default function UserRegistration() {
                     id="display-currency"
                     value={displayCurrencyId ?? ""}
                     onChange={event => setDisplayCurrencyId(Number(event.target.value))}
-                    className="border-input bg-transparent focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                    className="border-input bg-slate-800 text-slate-100 [&>option]:bg-slate-800 [&>option]:text-slate-100 focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
                     disabled={currencies.length === 0}
                   >
                     <option value="" disabled>Select a currency</option>
@@ -225,7 +225,7 @@ export default function UserRegistration() {
                 </div>
               </TooltipTrigger>
               <TooltipContent className="opacity-90">
-                <span className="text-sm">This is the currency in which the total value of the user's assets will be displayed.</span>
+                <span className="text-sm">This is the currency in which the total value of your assets will be displayed.</span>
               </TooltipContent>
             </Tooltip>
             {currencyError && <p className="text-sm text-red-300" role="alert">{currencyError}</p>}
