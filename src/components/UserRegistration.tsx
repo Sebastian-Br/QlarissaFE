@@ -214,10 +214,10 @@ export default function UserRegistration() {
                     id="display-currency"
                     value={displayCurrencyId ?? ""}
                     onChange={event => setDisplayCurrencyId(Number(event.target.value))}
-                    className="border-input bg-slate-800 text-slate-100 [&>option]:bg-slate-800 [&>option]:text-slate-100 focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50"
+                    className={`border-input bg-transparent [&>option]:bg-background [&>option]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 ${displayCurrencyId === null ? "text-muted-foreground opacity-70" : "text-foreground"}`}
                     disabled={currencies.length === 0}
                   >
-                    <option value="" disabled>Select a currency</option>
+                    <option value="" disabled>select a currency</option>
                     {currencies.map(currency => (
                       <option key={currency.id} value={currency.id}>{currency.symbol} — {currency.name}</option>
                     ))}
