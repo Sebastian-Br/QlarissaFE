@@ -161,11 +161,11 @@ export default function Dashboard() {
           <div className="relative">
             <div className="flex items-center gap-3 rounded-xl border border-sky-200/15 bg-slate-900/70 px-4 shadow-lg shadow-slate-950/20 focus-within:border-sky-400/60">
               <Search size={19} className="shrink-0 text-sky-300" />
-              <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 w-full bg-transparent text-base text-white outline-none placeholder:text-slate-500" placeholder="Search securities by name or symbol" aria-label="Search securities" />
+              <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 w-full bg-transparent text-base text-white outline-none placeholder:text-slate-500" placeholder="Search securities by name or ticker symbol" aria-label="Search securities" />
               {isSearching && <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-transparent" />}
               <span className="group relative shrink-0">
                 <button type="button" aria-label="Toggle search for unknown securities" aria-pressed={includeUnknown} onClick={() => { setIncludeUnknown((enabled) => !enabled); setHoveredColumn(null); }} className={`grid h-8 w-8 place-items-center rounded-lg transition-colors ${includeUnknown ? "bg-sky-400/15 text-sky-300 hover:bg-sky-400/25" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>
-                  <Eye size={18} fill={includeUnknown ? "currentColor" : "none"} />
+                  <Eye size={18} fill={includeUnknown ? "#08243d" : "none"} />
                 </button>
                 <span role="tooltip" className="pointer-events-none absolute right-0 top-full z-30 mt-2 w-56 rounded-lg border border-sky-200/15 bg-[#08243d] px-3 py-2 text-center !text-xs leading-relaxed text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">Search securities not currently part of Qlarissa&apos;s database</span>
               </span>
