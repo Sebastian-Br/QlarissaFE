@@ -174,7 +174,7 @@ export default function Dashboard() {
               </div>
             )}
           </div>
-          <div className="flex items-center justify-start gap-3 lg:justify-end"><span className="hidden text-sm text-slate-400 sm:block">Your portfolio</span><button className="flex items-center gap-2 rounded-xl border border-sky-200/15 bg-slate-900/60 px-3 py-2 text-sm font-medium hover:bg-slate-800"><span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-400/15 text-xs text-sky-200">SB</span><ChevronDown size={16} className="text-slate-400" /></button></div>
+          <div className="flex items-center justify-start gap-3 lg:justify-end"><button className="flex items-center gap-2 rounded-xl border border-sky-200/15 bg-slate-900/60 px-3 py-2 text-sm font-medium hover:bg-slate-800"><span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-400/15 text-xs text-sky-200">SB</span><ChevronDown size={16} className="text-slate-400" /></button></div>
         </header>
 
         <section className="grid gap-5 py-8 xl:grid-cols-[1fr_1.45fr_1fr]">
