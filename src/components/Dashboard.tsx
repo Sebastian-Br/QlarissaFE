@@ -62,12 +62,12 @@ function SecurityResult({ result }: { result: SearchResult }) {
   return (
     <button className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-800/80">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-semibold text-slate-100">{result.symbol}</span>
-        <span className="text-xs text-slate-400">{result.exchangeShortName || result.exchange}</span>
+        <p className="min-w-0 truncate font-semibold text-slate-100">{result.name}</p>
+        <span className="shrink-0 rounded-md bg-slate-700/70 px-1.5 py-0.5 !text-[10px] font-medium uppercase tracking-wide text-slate-300">{securityTypeLabel(result.securityType)}</span>
       </div>
-      <div className="mt-1 flex items-center gap-2">
-        <p className="truncate text-sm text-slate-400">{result.name}</p>
-        <span className="shrink-0 rounded-md bg-slate-700/70 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-300">{securityTypeLabel(result.securityType)}</span>
+      <div className="mt-1 flex items-center justify-between gap-3">
+        <span className="font-semibold text-slate-300">{result.symbol}</span>
+        <span className="text-xs text-slate-400">{result.exchangeShortName || result.exchange}</span>
       </div>
     </button>
   );
@@ -105,6 +105,7 @@ export default function Dashboard() {
   const [unknown, setUnknown] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [hoveredColumn, setHoveredColumn] = useState<"known" | "unknown" | null>(null);
   const requestRef = useRef(0);
 
   useEffect(() => {
@@ -155,9 +156,10 @@ export default function Dashboard() {
             </div>
             {hasSearchContent && (
               <div className="absolute left-0 right-0 top-[calc(100%+10px)] overflow-hidden rounded-2xl border border-sky-200/15 bg-[#08243d] shadow-2xl shadow-slate-950/50">
-                {searchError ? <p className="p-5 text-center text-sm text-slate-400">Search is temporarily unavailable. Please try again.</p> : <div className="grid grid-cols-1 divide-y divide-slate-700/60 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-                  <div className="min-w-0 p-3"><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Known Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No known securities found.</p>}</div>
-                  <div className="min-w-0 p-3"><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{unknown.length ? unknown.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>
+                {searchError ? <p className="p-5 text-center text-sm text-slate-400">Search is temporarily unavailable. Please try again.</p> : <div className={`relative grid grid-cols-1 divide-y divide-slate-700/60 transition-[grid-template-columns] duration-200 sm:divide-x sm:divide-y-0 ${hoveredColumn === "known" ? "sm:grid-cols-[minmax(100%,1fr)_0fr]" : hoveredColumn === "unknown" ? "sm:grid-cols-[0fr_minmax(100%,1fr)]" : "sm:grid-cols-2"}`} onMouseLeave={() => setHoveredColumn(null)}>
+                  <div className="min-w-0 overflow-hidden p-3" onMouseEnter={() => setHoveredColumn("known")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Known Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No known securities found.</p>}</div>
+                  <div className="min-w-0 overflow-hidden p-3" onMouseEnter={() => setHoveredColumn("unknown")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{unknown.length ? unknown.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>
+                  <div className="pointer-events-auto absolute left-1/2 top-0 hidden h-full w-5 -translate-x-1/2 sm:block" onMouseEnter={() => setHoveredColumn(null)} aria-hidden="true" />
                 </div>}
               </div>
             )}
