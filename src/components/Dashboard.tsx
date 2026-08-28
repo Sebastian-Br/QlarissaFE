@@ -55,7 +55,7 @@ function uniqueBySymbol(results: SearchResult[]) {
 }
 
 function securityTypeLabel(securityType: number) {
-  return { 1: "Stock", 2: "ETF", 3: "Cryptocurrency" }[securityType] ?? "Security";
+  return { 1: "Stock", 2: "ETF", 3: "Cryptocurrency", 4: "CurrencyPair" }[securityType] ?? "Security";
 }
 
 function SecurityResult({ result }: { result: SearchResult }) {
@@ -63,10 +63,10 @@ function SecurityResult({ result }: { result: SearchResult }) {
     <button className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-800/80">
       <p className="min-w-0 truncate font-semibold text-slate-100">{result.name}</p>
       <div className="mt-1 flex items-center justify-between gap-3">
-        <span className="font-semibold text-slate-300">{result.symbol}</span>
+        <span className="!text-xs font-semibold text-slate-300">{result.symbol}</span>
         <div className="flex shrink-0 flex-col items-end gap-0.5">
           <span className="text-xs text-slate-400">{result.exchangeShortName || result.exchange}</span>
-          <span className="rounded-md bg-slate-700/70 px-1.5 py-0.5 !text-[10px] font-medium uppercase tracking-wide text-slate-300">{securityTypeLabel(result.securityType)}</span>
+          <span className="rounded-md bg-slate-700/70 px-1.5 py-0.5 !text-[9px] font-medium uppercase tracking-wide text-slate-300">{securityTypeLabel(result.securityType)}</span>
         </div>
       </div>
     </button>
@@ -157,7 +157,7 @@ export default function Dashboard() {
             {hasSearchContent && (
               <div className="absolute left-0 right-0 top-[calc(100%+10px)] overflow-hidden rounded-2xl border border-sky-200/15 bg-[#08243d] shadow-2xl shadow-slate-950/50">
                 {searchError ? <p className="p-5 text-center text-sm text-slate-400">Search is temporarily unavailable. Please try again.</p> : <div className="relative flex flex-col divide-y divide-slate-700/60 sm:flex-row sm:divide-x sm:divide-y-0" onMouseLeave={() => setHoveredColumn(null)}>
-                  <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${hoveredColumn === "known" ? "sm:w-full" : hoveredColumn === "unknown" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("known")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Known Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No known securities found.</p>}</div>
+                  <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${hoveredColumn === "known" ? "sm:w-full" : hoveredColumn === "unknown" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("known")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No securities found.</p>}</div>
                   <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${hoveredColumn === "unknown" ? "sm:w-full" : hoveredColumn === "known" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("unknown")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{unknown.length ? unknown.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>
                   {hoveredColumn === null && <div className="pointer-events-auto absolute left-1/2 top-0 hidden h-full w-16 -translate-x-1/2 sm:block" onMouseEnter={() => setHoveredColumn(null)} aria-hidden="true" />}
                 </div>}
