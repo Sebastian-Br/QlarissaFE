@@ -92,9 +92,9 @@ function MoversCard({ title, icon: Icon, winners, losers }: { title: string; ico
 function MoverRow({ mover }: { mover: Mover }) {
   const positive = mover.change > 0;
   return (
-    <div className="flex items-center justify-between rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
-      <div className="min-w-0"><p className="font-medium text-slate-100">{mover.symbol}</p><p className="truncate text-xs text-slate-500">{mover.name}</p></div>
-      <div className="flex items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}>{positive ? <ArrowUpRight size={15} /> : <ArrowDownRight size={15} />}{Math.abs(mover.change).toFixed(2)}%</span></div>
+    <div className="flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
+      <p className="min-w-0 truncate font-medium text-slate-100">{mover.name}</p>
+      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}>{positive ? <ArrowUpRight size={15} /> : <ArrowDownRight size={15} />}{Math.abs(mover.change).toFixed(2)}%</span></div>
     </div>
   );
 }
@@ -145,7 +145,7 @@ export default function Dashboard() {
   return (
     <main className="min-h-screen bg-[#02182c] text-slate-100">
       <div className="mx-auto max-w-7xl px-5 pb-12 pt-6 sm:px-8">
-        <header className="relative z-20 flex flex-col gap-5 border-b border-sky-100/10 pb-6 lg:grid lg:grid-cols-[1fr_minmax(440px,1fr)_1fr] lg:items-center">
+        <header className="relative z-20 flex flex-col gap-5 border-b border-sky-100/10 pb-6 lg:grid lg:grid-cols-[minmax(150px,1fr)_minmax(620px,2.4fr)_minmax(150px,1fr)] lg:items-center">
           <a href="/dashboard" className="text-2xl font-bold tracking-tight text-white">Qlarissa<span className="text-sky-400">.</span></a>
           <div className="relative">
             <div className="flex items-center gap-3 rounded-xl border border-sky-200/15 bg-slate-900/70 px-4 shadow-lg shadow-slate-950/20 focus-within:border-sky-400/60">
