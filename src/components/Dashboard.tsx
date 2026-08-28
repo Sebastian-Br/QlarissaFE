@@ -47,21 +47,28 @@ const allocation = [
 function uniqueBySymbol(results: SearchResult[]) {
   const seen = new Set<string>();
   return results.filter((result) => {
-    const symbol = result.Symbol.toUpperCase();
+    const symbol = result.symbol.toUpperCase();
     if (seen.has(symbol)) return false;
     seen.add(symbol);
     return true;
   });
 }
 
+function securityTypeLabel(securityType: number) {
+  return { 1: "Stock", 2: "ETF", 3: "Cryptocurrency" }[securityType] ?? "Security";
+}
+
 function SecurityResult({ result }: { result: SearchResult }) {
   return (
     <button className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-800/80">
       <div className="flex items-center justify-between gap-3">
-        <span className="font-semibold text-slate-100">{result.Symbol}</span>
-        <span className="text-xs text-slate-400">{result.ExchangeShortName || result.Exchange}</span>
+        <span className="font-semibold text-slate-100">{result.symbol}</span>
+        <span className="text-xs text-slate-400">{result.exchangeShortName || result.exchange}</span>
       </div>
-      <p className="mt-1 truncate text-sm text-slate-400">{result.Name}</p>
+      <div className="mt-1 flex items-center gap-2">
+        <p className="truncate text-sm text-slate-400">{result.name}</p>
+        <span className="shrink-0 rounded-md bg-slate-700/70 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-300">{securityTypeLabel(result.securityType)}</span>
+      </div>
     </button>
   );
 }
@@ -118,9 +125,9 @@ export default function Dashboard() {
         ]);
         if (requestId !== requestRef.current) return;
         const uniqueKnown = uniqueBySymbol(internal);
-        const knownSymbols = new Set(uniqueKnown.map((result) => result.Symbol.toUpperCase()));
+        const knownSymbols = new Set(uniqueKnown.map((result) => result.symbol.toUpperCase()));
         setKnown(uniqueKnown);
-        setUnknown(uniqueBySymbol(external).filter((result) => !knownSymbols.has(result.Symbol.toUpperCase())));
+        setUnknown(uniqueBySymbol(external).filter((result) => !knownSymbols.has(result.symbol.toUpperCase())));
       } catch (error) {
         if (error instanceof DOMException && error.name === "AbortError") return;
         if (requestId === requestRef.current) { setKnown([]); setUnknown([]); setSearchError(true); }
@@ -149,8 +156,8 @@ export default function Dashboard() {
             {hasSearchContent && (
               <div className="absolute left-0 right-0 top-[calc(100%+10px)] overflow-hidden rounded-2xl border border-sky-200/15 bg-[#08243d] shadow-2xl shadow-slate-950/50">
                 {searchError ? <p className="p-5 text-center text-sm text-slate-400">Search is temporarily unavailable. Please try again.</p> : <div className="grid grid-cols-1 divide-y divide-slate-700/60 sm:grid-cols-2 sm:divide-x sm:divide-y-0">
-                  <div className="min-w-0 p-3"><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Known Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.Symbol}-${result.ExchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No known securities found.</p>}</div>
-                  <div className="min-w-0 p-3"><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{unknown.length ? unknown.map((result) => <SecurityResult key={`${result.Symbol}-${result.ExchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>
+                  <div className="min-w-0 p-3"><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Known Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No known securities found.</p>}</div>
+                  <div className="min-w-0 p-3"><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{unknown.length ? unknown.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>
                 </div>}
               </div>
             )}

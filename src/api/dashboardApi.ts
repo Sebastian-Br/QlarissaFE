@@ -1,11 +1,11 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export interface SearchResult {
-  Name: string;
-  Symbol: string;
-  SecurityType: string | number;
-  Exchange: string;
-  ExchangeShortName: string;
+  name: string;
+  symbol: string;
+  securityType: number;
+  exchange: string;
+  exchangeShortName: string;
 }
 
 async function search(endpoint: string, userQuery: string, signal: AbortSignal): Promise<SearchResult[]> {
@@ -23,7 +23,14 @@ async function search(endpoint: string, userQuery: string, signal: AbortSignal):
     throw new Error("Unable to search securities.");
   }
 
-  return response.json();
+  const results: Array<Partial<SearchResult>> = await response.json();
+  return results.map((result) => ({
+    name: result.name ?? "",
+    symbol: result.symbol ?? "",
+    securityType: result.securityType ?? 1,
+    exchange: result.exchange ?? "",
+    exchangeShortName: result.exchangeShortName ?? "",
+  }));
 }
 
 export function searchSecuritiesInternally(userQuery: string, signal: AbortSignal) {
