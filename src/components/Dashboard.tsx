@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Search, TrendingUp, Wallet } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Search, TrendingUp } from "lucide-react";
 import { searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
 
 interface Mover {
@@ -37,11 +37,13 @@ const holdingLosers: Mover[] = [
   { symbol: "PYPL", name: "PayPal Holdings", price: "$63.55", change: -2.16 },
 ];
 
-const allocation = [
-  { name: "Technology", value: 42, color: "#5eead4" },
-  { name: "Index funds", value: 28, color: "#60a5fa" },
-  { name: "Consumer", value: 16, color: "#a78bfa" },
-  { name: "Healthcare", value: 14, color: "#fbbf24" },
+const holdingAllocation = [
+  { name: "AAPL", value: 24, color: "#5eead4" },
+  { name: "VOO", value: 22, color: "#60a5fa" },
+  { name: "MSFT", value: 19, color: "#a78bfa" },
+  { name: "NVDA", value: 15, color: "#fbbf24" },
+  { name: "TSLA", value: 11, color: "#fb7185" },
+  { name: "BTC", value: 9, color: "#c084fc" },
 ];
 
 function uniqueBySymbol(results: SearchResult[]) {
@@ -105,6 +107,7 @@ export default function Dashboard() {
   const [unknown, setUnknown] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
+  const [includeUnknown, setIncludeUnknown] = useState(true);
   const [hoveredColumn, setHoveredColumn] = useState<"known" | "unknown" | null>(null);
   const requestRef = useRef(0);
 
@@ -122,7 +125,7 @@ export default function Dashboard() {
       try {
         const [internal, external] = await Promise.all([
           searchSecuritiesInternally(trimmedQuery, controller.signal),
-          searchSecuritiesExternally(trimmedQuery, controller.signal),
+          includeUnknown ? searchSecuritiesExternally(trimmedQuery, controller.signal) : Promise.resolve([]),
         ]);
         if (requestId !== requestRef.current) return;
         const uniqueKnown = uniqueBySymbol(internal);
@@ -138,10 +141,17 @@ export default function Dashboard() {
     }, 300);
 
     return () => { window.clearTimeout(timer); controller.abort(); };
-  }, [query]);
+  }, [query, includeUnknown]);
 
   const hasSearchContent = query.trim().length > 0;
-  const chartStops = "#5eead4 0deg 151deg, #60a5fa 151deg 252deg, #a78bfa 252deg 310deg, #fbbf24 310deg 360deg";
+  let chartStart = 0;
+  const chartStops = holdingAllocation.map((holding) => {
+    const chartEnd = chartStart + holding.value * 3.6;
+    const stop = `${holding.color} ${chartStart}deg ${chartEnd}deg`;
+    chartStart = chartEnd;
+    return stop;
+  }).join(", ");
+  const activeColumn = includeUnknown ? hoveredColumn : "known";
 
   return (
     <main className="min-h-screen bg-[#02182c] text-slate-100">
@@ -154,12 +164,16 @@ export default function Dashboard() {
               <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 w-full bg-transparent text-base text-white outline-none placeholder:text-slate-500" placeholder="Search securities by name or symbol" aria-label="Search securities" />
               {isSearching && <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-transparent" />}
             </div>
+            <button type="button" aria-pressed={includeUnknown} onClick={() => { setIncludeUnknown((enabled) => !enabled); setHoveredColumn(null); }} className="mt-2 flex items-center gap-2 px-1 text-left text-xs text-slate-400 transition-colors hover:text-slate-200">
+              <span className={`grid h-4 w-4 place-items-center rounded border ${includeUnknown ? "border-sky-400 bg-sky-400 text-[#02182c]" : "border-slate-600 bg-transparent"}`}>{includeUnknown && "✓"}</span>
+              Include unknown securities
+            </button>
             {hasSearchContent && (
               <div className="absolute left-0 right-0 top-[calc(100%+10px)] overflow-hidden rounded-2xl border border-sky-200/15 bg-[#08243d] shadow-2xl shadow-slate-950/50">
                 {searchError ? <p className="p-5 text-center text-sm text-slate-400">Search is temporarily unavailable. Please try again.</p> : <div className="relative flex flex-col divide-y divide-slate-700/60 sm:flex-row sm:divide-x sm:divide-y-0" onMouseLeave={() => setHoveredColumn(null)}>
-                  <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${hoveredColumn === "known" ? "sm:w-full" : hoveredColumn === "unknown" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("known")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No securities found.</p>}</div>
-                  <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${hoveredColumn === "unknown" ? "sm:w-full" : hoveredColumn === "known" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("unknown")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{unknown.length ? unknown.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>
-                  {hoveredColumn === null && <div className="pointer-events-auto absolute left-1/2 top-0 hidden h-full w-16 -translate-x-1/2 sm:block" onMouseEnter={() => setHoveredColumn(null)} aria-hidden="true" />}
+                  <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${activeColumn === "known" ? "sm:w-full" : activeColumn === "unknown" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("known")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No securities found.</p>}</div>
+                  {includeUnknown && <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${activeColumn === "unknown" ? "sm:w-full" : activeColumn === "known" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("unknown")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{unknown.length ? unknown.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>}
+                  {includeUnknown && hoveredColumn === null && <div className="pointer-events-auto absolute left-1/2 top-0 hidden h-full w-16 -translate-x-1/2 sm:block" onMouseEnter={() => setHoveredColumn(null)} aria-hidden="true" />}
                 </div>}
               </div>
             )}
@@ -167,16 +181,10 @@ export default function Dashboard() {
           <div className="flex items-center justify-start gap-3 lg:justify-end"><span className="hidden text-sm text-slate-400 sm:block">Your portfolio</span><button className="flex items-center gap-2 rounded-xl border border-sky-200/15 bg-slate-900/60 px-3 py-2 text-sm font-medium hover:bg-slate-800"><span className="grid h-7 w-7 place-items-center rounded-lg bg-sky-400/15 text-xs text-sky-200">SB</span><ChevronDown size={16} className="text-slate-400" /></button></div>
         </header>
 
-        <section className="grid gap-5 py-8 lg:grid-cols-[1.15fr_1fr_1fr]">
-          <div className="rounded-2xl border border-sky-200/10 bg-gradient-to-br from-[#0d3858] to-slate-900 p-6 shadow-xl shadow-slate-950/20"><p className="text-sm font-medium text-sky-200">Portfolio value</p><div className="mt-3 flex items-end justify-between gap-3"><div><p className="text-3xl font-semibold tracking-tight text-white">$24,860.40</p><p className="mt-2 flex items-center gap-1 text-sm font-medium text-emerald-400"><ArrowUpRight size={16} />$438.20 (1.79%) today</p></div><Wallet className="text-sky-300/70" size={30} /></div></div>
-          <div className="rounded-2xl border border-sky-200/10 bg-slate-900/60 p-6"><p className="text-sm font-medium text-slate-400">Total return</p><p className="mt-3 text-3xl font-semibold text-white">+$3,410.40</p><p className="mt-2 text-sm text-emerald-400">+15.90% all time</p></div>
-          <div className="rounded-2xl border border-sky-200/10 bg-slate-900/60 p-6"><p className="text-sm font-medium text-slate-400">Buying power</p><p className="mt-3 text-3xl font-semibold text-white">$1,250.00</p><p className="mt-2 text-sm text-slate-500">Available to invest</p></div>
-        </section>
-
-        <section className="grid gap-5 xl:grid-cols-[1fr_1fr_0.9fr]">
+        <section className="grid gap-5 py-8 xl:grid-cols-[1fr_1fr_1.45fr]">
           <MoversCard title="Daily watch list" icon={BarChart3} winners={marketWinners} losers={marketLosers} />
           <MoversCard title="Your holdings" icon={BriefcaseBusiness} winners={holdingWinners} losers={holdingLosers} />
-          <section className="rounded-2xl border border-sky-200/10 bg-slate-900/60 p-5 shadow-xl shadow-slate-950/20"><div><h2 className="font-semibold text-slate-100">Holdings allocation</h2><p className="mt-1 text-sm text-slate-400">Your portfolio by category</p></div><div className="relative mx-auto my-7 grid h-48 w-48 place-items-center rounded-full" style={{ background: `conic-gradient(${chartStops})` }}><div className="grid h-32 w-32 place-items-center rounded-full bg-[#08243d] text-center"><div><p className="text-xs text-slate-400">Holdings value</p><p className="mt-1 text-lg font-semibold text-white">$24,860</p></div></div></div><div className="grid grid-cols-2 gap-x-3 gap-y-3">{allocation.map((item) => <div key={item.name} className="flex items-center gap-2 text-xs text-slate-400"><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} /><span>{item.name}</span><span className="ml-auto text-slate-200">{item.value}%</span></div>)}</div></section>
+          <section className="rounded-2xl border border-sky-200/10 bg-slate-900/60 p-6 shadow-xl shadow-slate-950/20 xl:row-span-1"><div><h2 className="font-semibold text-slate-100">Holdings allocation</h2><p className="mt-1 text-sm text-slate-400">Portfolio by individual security</p></div><div className="relative mx-auto my-8 grid h-64 w-64 place-items-center rounded-full" style={{ background: `conic-gradient(${chartStops})` }}><div className="grid h-44 w-44 place-items-center rounded-full bg-[#08243d] text-center"><div><p className="!text-xs text-slate-400">Portfolio value</p><p className="mt-1 text-2xl font-semibold text-white">$24,860.40</p><p className="mt-2 flex items-center justify-center gap-1 !text-xs font-medium text-emerald-400"><ArrowUpRight size={14} />$438.20 (1.79%)</p></div></div></div><div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">{holdingAllocation.map((holding) => <div key={holding.name} className="flex items-center gap-2 text-xs text-slate-400"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: holding.color }} /><span>{holding.name}</span><span className="ml-auto text-slate-200">{holding.value}%</span></div>)}</div></section>
         </section>
       </div>
     </main>
