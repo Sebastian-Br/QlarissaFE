@@ -38,12 +38,12 @@ const holdingLosers: Mover[] = [
 ];
 
 const holdingAllocation = [
-  { name: "AAPL", value: 24, color: "#5eead4" },
-  { name: "VOO", value: 22, color: "#60a5fa" },
-  { name: "MSFT", value: 19, color: "#a78bfa" },
-  { name: "NVDA", value: 15, color: "#fbbf24" },
-  { name: "TSLA", value: 11, color: "#fb7185" },
-  { name: "BTC", value: 9, color: "#c084fc" },
+  { symbol: "AAPL", name: "Apple Inc.", value: 24, color: "#5eead4" },
+  { symbol: "VOO", name: "Vanguard S&P 500 ETF", value: 22, color: "#60a5fa" },
+  { symbol: "MSFT", name: "Microsoft Corporation", value: 19, color: "#a78bfa" },
+  { symbol: "NVDA", name: "NVIDIA Corporation", value: 15, color: "#fbbf24" },
+  { symbol: "TSLA", name: "Tesla, Inc.", value: 11, color: "#fb7185" },
+  { symbol: "BTC", name: "Bitcoin", value: 9, color: "#c084fc" },
 ];
 
 function uniqueBySymbol(results: SearchResult[]) {
@@ -108,6 +108,7 @@ export default function Dashboard() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(false);
   const [includeUnknown, setIncludeUnknown] = useState(true);
+  const [hoveredHolding, setHoveredHolding] = useState<(typeof holdingAllocation)[number] | null>(null);
   const [hoveredColumn, setHoveredColumn] = useState<"known" | "unknown" | null>(null);
   const requestRef = useRef(0);
 
@@ -144,13 +145,6 @@ export default function Dashboard() {
   }, [query, includeUnknown]);
 
   const hasSearchContent = query.trim().length > 0;
-  let chartStart = 0;
-  const chartStops = holdingAllocation.map((holding) => {
-    const chartEnd = chartStart + holding.value * 3.6;
-    const stop = `${holding.color} ${chartStart}deg ${chartEnd}deg`;
-    chartStart = chartEnd;
-    return stop;
-  }).join(", ");
   const activeColumn = includeUnknown ? hoveredColumn : "known";
 
   return (
@@ -186,7 +180,7 @@ export default function Dashboard() {
         <section className="grid gap-5 py-8 xl:grid-cols-[1fr_1fr_1.45fr]">
           <MoversCard title="Daily watch list" icon={BarChart3} winners={marketWinners} losers={marketLosers} />
           <MoversCard title="Your holdings" icon={BriefcaseBusiness} winners={holdingWinners} losers={holdingLosers} />
-          <section className="rounded-2xl border border-sky-200/10 bg-slate-900/60 p-6 shadow-xl shadow-slate-950/20 xl:row-span-1"><div><h2 className="font-semibold text-slate-100">Holdings allocation</h2><p className="mt-1 text-sm text-slate-400">Portfolio by individual security</p></div><div className="relative mx-auto my-8 grid h-64 w-64 place-items-center rounded-full" style={{ background: `conic-gradient(${chartStops})` }}><div className="grid h-44 w-44 place-items-center rounded-full bg-[#08243d] text-center"><div><p className="!text-xs text-slate-400">Portfolio value</p><p className="mt-1 text-2xl font-semibold text-white">$24,860.40</p><p className="mt-2 flex items-center justify-center gap-1 !text-xs font-medium text-emerald-400"><ArrowUpRight size={14} />$438.20 (1.79%)</p></div></div></div><div className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">{holdingAllocation.map((holding) => <div key={holding.name} className="flex items-center gap-2 text-xs text-slate-400"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: holding.color }} /><span>{holding.name}</span><span className="ml-auto text-slate-200">{holding.value}%</span></div>)}</div></section>
+          <section className="rounded-2xl border border-sky-200/10 bg-slate-900/60 p-6 shadow-xl shadow-slate-950/20 xl:row-span-1"><div><h2 className="font-semibold text-slate-100">Holdings allocation</h2><p className="mt-1 text-sm text-slate-400">Hover over a segment to inspect a holding</p></div><div className="relative mx-auto my-8 h-64 w-64"><svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label="Holdings allocation chart">{(() => { let offset = 0; return holdingAllocation.map((holding) => { const currentOffset = offset; offset += holding.value; return <circle key={holding.symbol} cx="50" cy="50" r="36" fill="none" stroke={holding.color} strokeWidth="28" pathLength="100" strokeDasharray={`${holding.value} ${100 - holding.value}`} strokeDashoffset={-currentOffset} className={`cursor-pointer transition-opacity duration-200 ${hoveredHolding && hoveredHolding.symbol !== holding.symbol ? "opacity-35" : "opacity-100"}`} onMouseEnter={() => setHoveredHolding(holding)} onMouseLeave={() => setHoveredHolding(null)} />; }); })()}</svg><div className="pointer-events-none absolute inset-0 grid place-items-center rounded-full"><div className="text-center"><p className="!text-xs text-slate-400">Portfolio value</p><p className="mt-1 text-2xl font-semibold text-white">$24,860.40</p><p className="mt-2 flex items-center justify-center gap-1 !text-xs font-medium text-emerald-400"><ArrowUpRight size={14} />$438.20 (1.79%)</p></div></div>{hoveredHolding && <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-sky-200/20 bg-[#08243d] px-3 py-2 text-center shadow-xl"><p className="whitespace-nowrap !text-xs font-semibold text-white">{hoveredHolding.name}</p><p className="mt-0.5 !text-xs text-sky-300">{hoveredHolding.value}% of portfolio</p></div>}</div></section>
         </section>
       </div>
     </main>
