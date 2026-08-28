@@ -62,10 +62,10 @@ function SecurityResult({ result }: { result: SearchResult }) {
   return (
     <button className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-800/80">
       <p className="min-w-0 truncate font-semibold text-slate-100">{result.name}</p>
-      <div className="mt-1 flex items-center justify-between gap-3">
-        <span className="!text-xs font-semibold text-slate-300">{result.symbol}</span>
-        <div className="flex shrink-0 flex-col items-end gap-0.5">
-          <span className="text-xs text-slate-400">{result.exchangeShortName || result.exchange}</span>
+      <div className="mt-1 flex flex-col items-end gap-0.5">
+        <span className="text-xs text-slate-400">{result.exchangeShortName || result.exchange}</span>
+        <div className="flex items-center gap-2">
+          <span className="!text-[11px] font-medium text-slate-500">{result.symbol}</span>
           <span className="rounded-md bg-slate-700/70 px-1.5 py-0.5 !text-[9px] font-medium uppercase tracking-wide text-slate-300">{securityTypeLabel(result.securityType)}</span>
         </div>
       </div>
