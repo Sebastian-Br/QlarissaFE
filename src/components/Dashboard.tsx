@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Search, TrendingUp } from "lucide-react";
+import { ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
 import { searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
 
 interface Mover {
@@ -155,7 +155,7 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-[#02182c] text-slate-100">
-      <div className="mx-auto max-w-7xl px-5 pb-12 pt-6 sm:px-8">
+      <div className="mx-auto w-full max-w-[1440px] px-5 pb-12 pt-6 sm:px-8 lg:px-10">
         <header className="relative z-20 flex flex-col gap-5 border-b border-sky-100/10 pb-6 lg:grid lg:grid-cols-[minmax(150px,1fr)_minmax(620px,2.4fr)_minmax(150px,1fr)] lg:items-center">
           <a href="/dashboard" className="text-2xl font-bold tracking-tight text-white">Qlarissa<span className="text-sky-400">.</span></a>
           <div className="relative">
@@ -163,11 +163,13 @@ export default function Dashboard() {
               <Search size={19} className="shrink-0 text-sky-300" />
               <input value={query} onChange={(event) => setQuery(event.target.value)} className="h-12 w-full bg-transparent text-base text-white outline-none placeholder:text-slate-500" placeholder="Search securities by name or symbol" aria-label="Search securities" />
               {isSearching && <span className="h-4 w-4 animate-spin rounded-full border-2 border-sky-300 border-t-transparent" />}
+              <span className="group relative shrink-0">
+                <button type="button" aria-label="Toggle search for unknown securities" aria-pressed={includeUnknown} onClick={() => { setIncludeUnknown((enabled) => !enabled); setHoveredColumn(null); }} className={`grid h-8 w-8 place-items-center rounded-lg transition-colors ${includeUnknown ? "bg-sky-400/15 text-sky-300 hover:bg-sky-400/25" : "text-slate-500 hover:bg-slate-800 hover:text-slate-300"}`}>
+                  <Eye size={18} fill={includeUnknown ? "currentColor" : "none"} />
+                </button>
+                <span role="tooltip" className="pointer-events-none absolute right-0 top-full z-30 mt-2 w-56 rounded-lg border border-sky-200/15 bg-[#08243d] px-3 py-2 text-center !text-xs leading-relaxed text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">Search securities not currently part of Qlarissa&apos;s database</span>
+              </span>
             </div>
-            <button type="button" aria-pressed={includeUnknown} onClick={() => { setIncludeUnknown((enabled) => !enabled); setHoveredColumn(null); }} className="mt-2 flex items-center gap-2 px-1 text-left text-xs text-slate-400 transition-colors hover:text-slate-200">
-              <span className={`grid h-4 w-4 place-items-center rounded border ${includeUnknown ? "border-sky-400 bg-sky-400 text-[#02182c]" : "border-slate-600 bg-transparent"}`}>{includeUnknown && "✓"}</span>
-              Include unknown securities
-            </button>
             {hasSearchContent && (
               <div className="absolute left-0 right-0 top-[calc(100%+10px)] overflow-hidden rounded-2xl border border-sky-200/15 bg-[#08243d] shadow-2xl shadow-slate-950/50">
                 {searchError ? <p className="p-5 text-center text-sm text-slate-400">Search is temporarily unavailable. Please try again.</p> : <div className="relative flex flex-col divide-y divide-slate-700/60 sm:flex-row sm:divide-x sm:divide-y-0" onMouseLeave={() => setHoveredColumn(null)}>
