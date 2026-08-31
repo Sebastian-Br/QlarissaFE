@@ -111,22 +111,22 @@ input::placeholder, textarea::placeholder {
 }
 
 @keyframes movement-arrow-up {
-  0% { opacity: 0; transform: translateY(8px) scale(0.8); }
-  25% { opacity: 0.9; }
-  100% { opacity: 0; transform: translateY(-18px) scale(1); }
+  0% { opacity: 0; transform: translateY(8px) scale(0.75); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(-22px) scale(1.05); }
 }
 
 @keyframes movement-arrow-down {
-  0% { opacity: 0; transform: translateY(-8px) scale(0.8); }
-  25% { opacity: 0.9; }
-  100% { opacity: 0; transform: translateY(18px) scale(1); }
+  0% { opacity: 0; transform: translateY(-8px) scale(0.75); }
+  25% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(22px) scale(1.05); }
 }
 
 .movement-arrow-fly-up,
 .movement-arrow-fly-down {
   animation-duration: 2.1s;
   animation-iteration-count: infinite;
-  animation-timing-function: ease-out;
+  animation-timing-function: ease-in-out;
 }
 
 .movement-arrow-fly-up { animation-name: movement-arrow-up; }

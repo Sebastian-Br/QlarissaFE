@@ -115,12 +115,14 @@ function MoverRow({ mover }: { mover: Mover }) {
   const angle = Math.min((magnitude / 7) * 90, 90);
   const isHighMovement = magnitude > 7;
   const flyingArrowClass = positive ? "movement-arrow-fly-up" : "movement-arrow-fly-down";
+  const flyingArrowCount = Math.min(2 + Math.floor((magnitude - 7) / 4), 4);
+  const flyingArrowDuration = Math.max(0.9, 2.1 - (magnitude - 7) * 0.08);
   const StaticArrow = isHighMovement ? (positive ? ArrowUp : ArrowDown) : ArrowRight;
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
       <p className="min-w-0 truncate font-medium text-slate-100">{mover.name}</p>
-      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}><span className="relative grid h-5 w-5 place-items-center"><StaticArrow size={15} style={!isHighMovement ? { transform: `rotate(${positive ? -angle : angle}deg)` } : undefined} />{isHighMovement && Array.from({ length: 2 }, (_, index) => { const FlyingArrow = positive ? ArrowUp : ArrowDown; return <FlyingArrow key={index} size={12} className={`pointer-events-none absolute ${flyingArrowClass}`} style={{ animationDelay: `${index * 0.7}s` }} />; })}</span>{magnitude.toFixed(2)}%</span></div>
+      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}><span className="relative grid h-5 w-5 place-items-center"><StaticArrow size={15} style={!isHighMovement ? { transform: `rotate(${positive ? -angle : angle}deg)` } : undefined} />{isHighMovement && Array.from({ length: flyingArrowCount }, (_, index) => { const FlyingArrow = positive ? ArrowUp : ArrowDown; return <FlyingArrow key={index} size={14} strokeWidth={2.5} className={`pointer-events-none absolute ${flyingArrowClass}`} style={{ left: `${(index - (flyingArrowCount - 1) / 2) * 5}px`, animationDelay: `${index * (flyingArrowDuration / flyingArrowCount)}s`, animationDuration: `${flyingArrowDuration}s` }} />; })}</span>{magnitude.toFixed(2)}%</span></div>
     </div>
   );
 }
