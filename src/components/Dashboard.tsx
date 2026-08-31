@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowDownRight, ArrowRight, ArrowUp, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
 import { addSecurity, searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
 
 interface Mover {
@@ -10,31 +10,31 @@ interface Mover {
 }
 
 const marketWinners: Mover[] = [
-  { symbol: "NVDA", name: "NVIDIA Corporation", price: "$875.28", change: 4.82 },
-  { symbol: "TSLA", name: "Tesla, Inc.", price: "$193.57", change: 3.46 },
-  { symbol: "AMD", name: "Advanced Micro Devices", price: "$168.12", change: 2.91 },
-  { symbol: "SHOP", name: "Shopify Inc.", price: "$76.84", change: 2.24 },
+  { symbol: "NVDA", name: "NVIDIA Corporation", price: "$875.28", change: 0.82 },
+  { symbol: "TSLA", name: "Tesla, Inc.", price: "$193.57", change: 2.91 },
+  { symbol: "AMD", name: "Advanced Micro Devices", price: "$168.12", change: 5.25 },
+  { symbol: "SHOP", name: "Shopify Inc.", price: "$76.84", change: 7.00 },
 ];
 
 const marketLosers: Mover[] = [
   { symbol: "DIS", name: "The Walt Disney Company", price: "$111.36", change: -1.72 },
-  { symbol: "PFE", name: "Pfizer Inc.", price: "$27.43", change: -2.18 },
-  { symbol: "INTC", name: "Intel Corporation", price: "$42.19", change: -3.05 },
-  { symbol: "BABA", name: "Alibaba Group", price: "$72.09", change: -4.41 },
+  { symbol: "PFE", name: "Pfizer Inc.", price: "$27.43", change: -4.41 },
+  { symbol: "INTC", name: "Intel Corporation", price: "$42.19", change: -8.65 },
+  { symbol: "BABA", name: "Alibaba Group", price: "$72.09", change: -12.80 },
 ];
 
 const holdingWinners: Mover[] = [
-  { symbol: "MSFT", name: "Microsoft Corporation", price: "$418.47", change: 2.31 },
-  { symbol: "VOO", name: "Vanguard S&P 500 ETF", price: "$482.16", change: 1.15 },
-  { symbol: "AAPL", name: "Apple Inc.", price: "$190.90", change: 0.82 },
-  { symbol: "NESN", name: "Nestlé S.A.", price: "$105.40", change: 0.36 },
+  { symbol: "MSFT", name: "Microsoft Corporation", price: "$418.47", change: 3.46 },
+  { symbol: "VOO", name: "Vanguard S&P 500 ETF", price: "$482.16", change: 6.15 },
+  { symbol: "AAPL", name: "Apple Inc.", price: "$190.90", change: 7.20 },
+  { symbol: "NESN", name: "Nestlé S.A.", price: "$105.40", change: 13.25 },
 ];
 
 const holdingLosers: Mover[] = [
   { symbol: "V", name: "Visa Inc.", price: "$276.80", change: -0.48 },
-  { symbol: "JNJ", name: "Johnson & Johnson", price: "$156.12", change: -0.91 },
-  { symbol: "ENPH", name: "Enphase Energy", price: "$115.70", change: -1.73 },
-  { symbol: "PYPL", name: "PayPal Holdings", price: "$63.55", change: -2.16 },
+  { symbol: "JNJ", name: "Johnson & Johnson", price: "$156.12", change: -2.18 },
+  { symbol: "ENPH", name: "Enphase Energy", price: "$115.70", change: -9.40 },
+  { symbol: "PYPL", name: "PayPal Holdings", price: "$63.55", change: -15.25 },
 ];
 
 const holdingAllocation = [
@@ -109,14 +109,14 @@ function MoversCard({ title, icon: Icon, winners, losers }: { title: string; ico
 function MoverRow({ mover }: { mover: Mover }) {
   const positive = mover.change > 0;
   const magnitude = Math.abs(mover.change);
-  const MovementIcon = positive
-    ? magnitude >= 5 ? ArrowUp : magnitude >= 1 ? ArrowUpRight : ArrowRight
-    : magnitude >= 5 ? ArrowDown : magnitude >= 1 ? ArrowDownRight : ArrowRight;
+  const angle = Math.min((magnitude / 7) * 90, 90);
+  const arrowCount = magnitude > 7 ? Math.ceil(magnitude / 7) : 1;
+  const arrowClassName = magnitude >= 12 ? "animate-bounce" : undefined;
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
       <p className="min-w-0 truncate font-medium text-slate-100">{mover.name}</p>
-      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}><MovementIcon size={15} className={magnitude >= 10 ? "animate-bounce" : undefined} />{magnitude.toFixed(2)}%</span></div>
+      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}>{Array.from({ length: arrowCount }, (_, index) => <ArrowRight key={index} size={15} className={arrowClassName} style={{ transform: `rotate(${positive ? -angle : angle}deg)` }} />)}{magnitude.toFixed(2)}%</span></div>
     </div>
   );
 }
