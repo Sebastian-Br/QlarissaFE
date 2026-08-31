@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowDownRight, ArrowRight, ArrowUp, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
 import { addSecurity, searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
 
 interface Mover {
@@ -108,10 +108,15 @@ function MoversCard({ title, icon: Icon, winners, losers }: { title: string; ico
 
 function MoverRow({ mover }: { mover: Mover }) {
   const positive = mover.change > 0;
+  const magnitude = Math.abs(mover.change);
+  const MovementIcon = positive
+    ? magnitude >= 5 ? ArrowUp : magnitude >= 1 ? ArrowUpRight : ArrowRight
+    : magnitude >= 5 ? ArrowDown : magnitude >= 1 ? ArrowDownRight : ArrowRight;
+
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
       <p className="min-w-0 truncate font-medium text-slate-100">{mover.name}</p>
-      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}>{positive ? <ArrowUpRight size={15} /> : <ArrowDownRight size={15} />}{Math.abs(mover.change).toFixed(2)}%</span></div>
+      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}><MovementIcon size={15} className={magnitude >= 10 ? "animate-bounce" : undefined} />{magnitude.toFixed(2)}%</span></div>
     </div>
   );
 }
