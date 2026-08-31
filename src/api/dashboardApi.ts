@@ -40,3 +40,21 @@ export function searchSecuritiesInternally(userQuery: string, signal: AbortSigna
 export function searchSecuritiesExternally(userQuery: string, signal: AbortSignal) {
   return search("/api/SearchBar/SearchSecuritiesExternally", userQuery, signal);
 }
+
+export async function addSecurity(tickerSymbol: string, signal: AbortSignal): Promise<string> {
+  const token = localStorage.getItem("jwt");
+  const response = await fetch(`${BASE_URL}/api/Security/Add?tickerSymbol=${encodeURIComponent(tickerSymbol)}`, {
+    method: "POST",
+    signal,
+    headers: {
+      accept: "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error("Unable to add security.");
+  }
+
+  return response.text();
+}
