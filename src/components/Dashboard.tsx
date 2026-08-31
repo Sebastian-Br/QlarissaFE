@@ -90,41 +90,42 @@ function UnknownSecurityResult({ result, isAdding, onAdd }: { result: SearchResu
   );
 }
 
-function MoversCard({ title, icon: Icon, winners, losers }: { title: string; icon: typeof TrendingUp; winners: Mover[]; losers: Mover[] }) {
+function MovementSignal({ mover, compact = false }: { mover: Mover; compact?: boolean }) {
+  const positive = mover.change > 0;
+  const magnitude = Math.abs(mover.change);
+  const isHighMovement = magnitude >= 7;
+  const angle = Math.min((magnitude / 7) * 90, 90);
+  const FlyingArrow = positive ? ArrowUp : ArrowDown;
+  const StaticArrow = compact || isHighMovement ? FlyingArrow : ArrowRight;
+  const flyingArrowCount = Math.min(2 + Math.floor(Math.max(0, magnitude - 7) / 4), 4);
+  const flyingArrowDuration = Math.max(0.9, 2.1 - Math.max(0, magnitude - 7) * 0.08);
+
+  return <span className={`flex items-center justify-center gap-0.5 font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}><span className={`relative grid place-items-center ${compact ? "h-9 w-9" : "h-5 w-5"}`}><StaticArrow size={compact ? 24 : 15} strokeWidth={compact ? 2.5 : 2} style={!compact && !isHighMovement ? { transform: `rotate(${positive ? -angle : angle}deg)` } : undefined} />{(compact || isHighMovement) && Array.from({ length: flyingArrowCount }, (_, index) => <FlyingArrow key={index} size={compact ? 19 : 14} strokeWidth={2.5} className={`pointer-events-none absolute ${positive ? "movement-arrow-fly-up" : "movement-arrow-fly-down"}`} style={{ left: `${(index - (flyingArrowCount - 1) / 2) * (compact ? 6 : 5)}px`, animationDelay: `${index * (flyingArrowDuration / flyingArrowCount)}s`, animationDuration: `${flyingArrowDuration}s` }} />)}</span>{!compact && `${magnitude.toFixed(2)}%`}</span>;
+}
+
+function MoversCard({ title, icon: Icon, winners, losers, side }: { title: string; icon: typeof TrendingUp; winners: Mover[]; losers: Mover[]; side: "left" | "right" }) {
   const sortedWinners = [...winners].sort((a, b) => b.change - a.change);
   const sortedLosers = [...losers].sort((a, b) => b.change - a.change);
+  const strongestWinner = sortedWinners[0];
+  const strongestLoser = sortedLosers[sortedLosers.length - 1];
 
   return (
-    <section className="rounded-2xl border border-sky-200/10 bg-slate-900/60 p-5 shadow-xl shadow-slate-950/20 backdrop-blur-sm">
-      <div className="mb-5 flex items-center gap-3">
-        <span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-400/10 text-sky-300"><Icon size={20} /></span>
-        <div><h2 className="font-semibold text-slate-100">{title}</h2><p className="text-sm text-slate-400">Today&apos;s movement</p></div>
+    <section tabIndex={0} className={`group relative overflow-hidden rounded-2xl border border-sky-200/10 bg-slate-900/60 shadow-xl shadow-slate-950/20 backdrop-blur-sm xl:h-64 xl:w-20 xl:cursor-pointer xl:transition-[width,height] xl:duration-500 xl:ease-out xl:hover:h-[35rem] xl:hover:w-full xl:focus:h-[35rem] xl:focus:w-full ${side === "right" ? "xl:ml-auto" : ""}`}>
+      <div aria-hidden="true" className="absolute inset-0 hidden flex-col items-center justify-between py-7 xl:flex xl:transition-opacity xl:duration-200 xl:group-hover:pointer-events-none xl:group-hover:opacity-0 xl:group-focus:pointer-events-none xl:group-focus:opacity-0">
+        <div className="flex flex-col items-center gap-2"><span className="text-[10px] font-semibold tracking-[0.2em] text-slate-500 [writing-mode:vertical-rl]">TOP GAINER</span><MovementSignal mover={strongestWinner} compact /><span className="text-xs font-semibold text-emerald-300">{strongestWinner.symbol}</span></div>
+        <span className="h-px w-8 bg-slate-700/80" />
+        <div className="flex flex-col items-center gap-2"><span className="text-xs font-semibold text-rose-300">{strongestLoser.symbol}</span><MovementSignal mover={strongestLoser} compact /><span className="text-[10px] font-semibold tracking-[0.2em] text-slate-500 [writing-mode:vertical-rl]">TOP LOSS</span></div>
       </div>
-      <div className="space-y-1">
-        {sortedWinners.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}
-        <div className="my-3 border-t border-slate-700/70" />
-        {sortedLosers.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}
+      <div className="p-5 xl:absolute xl:inset-0 xl:overflow-hidden xl:opacity-0 xl:transition-opacity xl:duration-200 xl:group-hover:opacity-100 xl:group-focus:opacity-100">
+        <div className="mb-5 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-400/10 text-sky-300"><Icon size={20} /></span><div><h2 className="font-semibold text-slate-100">{title}</h2><p className="text-sm text-slate-400">Today&apos;s movement</p></div></div>
+        <div className="space-y-1">{sortedWinners.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}<div className="my-3 border-t border-slate-700/70" />{sortedLosers.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}</div>
       </div>
     </section>
   );
 }
 
 function MoverRow({ mover }: { mover: Mover }) {
-  const positive = mover.change > 0;
-  const magnitude = Math.abs(mover.change);
-  const angle = Math.min((magnitude / 7) * 90, 90);
-  const isHighMovement = magnitude > 7;
-  const flyingArrowClass = positive ? "movement-arrow-fly-up" : "movement-arrow-fly-down";
-  const flyingArrowCount = Math.min(2 + Math.floor((magnitude - 7) / 4), 4);
-  const flyingArrowDuration = Math.max(0.9, 2.1 - (magnitude - 7) * 0.08);
-  const StaticArrow = isHighMovement ? (positive ? ArrowUp : ArrowDown) : ArrowRight;
-
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
-      <p className="min-w-0 truncate font-medium text-slate-100">{mover.name}</p>
-      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}><span className="relative grid h-5 w-5 place-items-center"><StaticArrow size={15} style={!isHighMovement ? { transform: `rotate(${positive ? -angle : angle}deg)` } : undefined} />{isHighMovement && Array.from({ length: flyingArrowCount }, (_, index) => { const FlyingArrow = positive ? ArrowUp : ArrowDown; return <FlyingArrow key={index} size={14} strokeWidth={2.5} className={`pointer-events-none absolute ${flyingArrowClass}`} style={{ left: `${(index - (flyingArrowCount - 1) / 2) * 5}px`, animationDelay: `${index * (flyingArrowDuration / flyingArrowCount)}s`, animationDuration: `${flyingArrowDuration}s` }} />; })}</span>{magnitude.toFixed(2)}%</span></div>
-    </div>
-  );
+  return <div className="flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50"><p className="min-w-0 truncate font-medium text-slate-100">{mover.name}</p><div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><MovementSignal mover={mover} /></div></div>;
 }
 
 export default function Dashboard() {
@@ -233,8 +234,8 @@ export default function Dashboard() {
         </header>
 
         <section className="grid gap-5 py-8 xl:grid-cols-[1fr_1.45fr_1fr]">
-          <MoversCard title="Daily watch list" icon={BarChart3} winners={marketWinners} losers={marketLosers} />
-          <div className="xl:order-3"><MoversCard title="Your holdings" icon={BriefcaseBusiness} winners={holdingWinners} losers={holdingLosers} /></div>
+          <MoversCard title="Daily watch list" icon={BarChart3} winners={marketWinners} losers={marketLosers} side="left" />
+          <div className="xl:order-3"><MoversCard title="Your holdings" icon={BriefcaseBusiness} winners={holdingWinners} losers={holdingLosers} side="right" /></div>
           <section className="order-2 rounded-2xl border border-sky-200/10 bg-slate-900/60 p-7 shadow-xl shadow-slate-950/20 xl:row-span-1"><div><h2 className="font-semibold text-slate-100">Holdings</h2></div><div className="relative mx-auto my-8 h-72 w-72"><svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label="Holdings allocation chart">{(() => { let offset = 0; return holdingAllocation.map((holding) => { const currentOffset = offset; offset += holding.value; return <circle key={holding.symbol} cx="50" cy="50" r="37" fill="none" stroke={holding.color} strokeWidth="20" pathLength="100" strokeDasharray={`${holding.value} ${100 - holding.value}`} strokeDashoffset={-currentOffset} className={`cursor-pointer transition-opacity duration-200 ${hoveredHolding && hoveredHolding.symbol !== holding.symbol ? "opacity-35" : "opacity-100"}`} onMouseEnter={() => setHoveredHolding(holding)} onMouseLeave={() => setHoveredHolding(null)} />; }); })()}</svg><div className="pointer-events-none absolute inset-0 grid place-items-center rounded-full"><div className="grid h-48 w-48 place-items-center rounded-full bg-[#08243d] text-center"><p className="text-2xl font-semibold text-white">$24,860.40</p><p className="mt-2 flex items-center justify-center gap-1 !text-xs font-medium text-emerald-400"><ArrowUpRight size={14} />$438.20 (1.79%)</p></div></div>{hoveredHolding && <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-sky-200/20 bg-[#08243d] px-3 py-2 text-center shadow-xl"><p className="whitespace-nowrap !text-xs font-semibold text-white">{hoveredHolding.name}</p><p className="mt-0.5 !text-xs text-sky-300">{hoveredHolding.value}%</p></div>}<div className="mt-2 space-y-3">{holdingAllocation.slice(0, 5).map((holding) => <div key={holding.symbol} className="flex items-center gap-3"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: holding.color }} /><span className="min-w-0 flex-1 truncate !text-sm text-slate-300">{holding.name}</span><span className="!text-sm font-medium text-slate-100">{holding.value}%</span></div>)}</div></div></section>
         </section>
       </div>
