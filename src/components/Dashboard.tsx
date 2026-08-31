@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDownRight, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
-import { searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
+import { addSecurity, searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
 
 interface Mover {
   symbol: string;
@@ -60,18 +60,33 @@ function securityTypeLabel(securityType: number) {
   return { 1: "Stock", 2: "ETF", 3: "Cryptocurrency", 4: "CurrencyPair" }[securityType] ?? "Security";
 }
 
-function SecurityResult({ result }: { result: SearchResult }) {
-  return (
-    <button className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-800/80">
-      <p className="min-w-0 truncate font-semibold text-slate-100">{result.name}</p>
-      <div className="mt-1 flex flex-col items-end gap-0.5">
-        <span className="text-xs text-slate-400">{result.exchangeShortName || result.exchange}</span>
-        <div className="flex items-center gap-2">
-          <span className="!text-[11px] font-medium text-slate-500">{result.symbol}</span>
-          <span className="rounded-md bg-slate-700/70 px-1.5 py-0.5 !text-[9px] font-medium uppercase tracking-wide text-slate-300">{securityTypeLabel(result.securityType)}</span>
-        </div>
+function SecurityDetails({ result }: { result: SearchResult }) {
+  return <>
+    <p className="min-w-0 truncate font-semibold text-slate-100">{result.name}</p>
+    <div className="mt-1 flex flex-col items-end gap-0.5">
+      <span className="text-xs text-slate-400">{result.exchangeShortName || result.exchange}</span>
+      <div className="flex items-center gap-2">
+        <span className="!text-[11px] font-medium text-slate-500">{result.symbol}</span>
+        <span className="rounded-md bg-slate-700/70 px-1.5 py-0.5 !text-[9px] font-medium uppercase tracking-wide text-slate-300">{securityTypeLabel(result.securityType)}</span>
       </div>
-    </button>
+    </div>
+  </>;
+}
+
+function SecurityResult({ result }: { result: SearchResult }) {
+  return <button className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-800/80"><SecurityDetails result={result} /></button>;
+}
+
+function UnknownSecurityResult({ result, isAdding, onAdd }: { result: SearchResult; isAdding: boolean; onAdd: (result: SearchResult) => void }) {
+  return (
+    <div className="group overflow-hidden rounded-xl px-3 py-3 transition-colors hover:bg-slate-800/80 focus-within:bg-slate-800/80">
+      <SecurityDetails result={result} />
+      <div className="grid max-h-0 grid-rows-[0fr] opacity-0 transition-all duration-300 ease-out group-hover:max-h-12 group-hover:grid-rows-[1fr] group-hover:pt-3 group-hover:opacity-100 group-focus-within:max-h-12 group-focus-within:grid-rows-[1fr] group-focus-within:pt-3 group-focus-within:opacity-100">
+        <button type="button" onClick={() => onAdd(result)} disabled={isAdding} className="min-h-0 overflow-hidden rounded-lg bg-violet-400 px-3 py-2 text-sm font-semibold text-slate-950 transition-colors hover:bg-violet-300 disabled:cursor-wait disabled:bg-violet-400/60 disabled:text-slate-900/70">
+          {isAdding ? <span className="flex items-center justify-center gap-2"><span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-slate-900/70 border-t-transparent" />Adding security…</span> : "Add Security"}
+        </button>
+      </div>
+    </div>
   );
 }
 
@@ -110,7 +125,12 @@ export default function Dashboard() {
   const [includeUnknown, setIncludeUnknown] = useState(true);
   const [hoveredHolding, setHoveredHolding] = useState<(typeof holdingAllocation)[number] | null>(null);
   const [hoveredColumn, setHoveredColumn] = useState<"known" | "unknown" | null>(null);
+  const [addingSymbol, setAddingSymbol] = useState<string | null>(null);
+  const [addError, setAddError] = useState(false);
   const requestRef = useRef(0);
+  const queryRef = useRef(query);
+
+  useEffect(() => { queryRef.current = query; }, [query]);
 
   useEffect(() => {
     const trimmedQuery = query.trim();
@@ -144,6 +164,30 @@ export default function Dashboard() {
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [query, includeUnknown]);
 
+  const addUnknownSecurity = async (result: SearchResult) => {
+    const searchQuery = queryRef.current.trim();
+    if (!searchQuery || addingSymbol) return;
+
+    const controller = new AbortController();
+    setAddingSymbol(result.symbol);
+    setAddError(false);
+    try {
+      await addSecurity(result.symbol, controller.signal);
+      const requestId = ++requestRef.current;
+      const internal = await searchSecuritiesInternally(searchQuery, controller.signal);
+      if (requestId !== requestRef.current || queryRef.current.trim() !== searchQuery) return;
+
+      const uniqueKnown = uniqueBySymbol(internal);
+      const knownSymbols = new Set(uniqueKnown.map((security) => security.symbol.toUpperCase()));
+      setKnown(uniqueKnown);
+      setUnknown((current) => current.filter((security) => !knownSymbols.has(security.symbol.toUpperCase())));
+    } catch (error) {
+      if (!(error instanceof DOMException && error.name === "AbortError")) setAddError(true);
+    } finally {
+      setAddingSymbol(null);
+    }
+  };
+
   const hasSearchContent = query.trim().length > 0;
   const activeColumn = includeUnknown ? hoveredColumn : "known";
 
@@ -168,7 +212,7 @@ export default function Dashboard() {
               <div className="absolute left-0 right-0 top-[calc(100%+10px)] overflow-hidden rounded-2xl border border-sky-200/15 bg-[#08243d] shadow-2xl shadow-slate-950/50">
                 {searchError ? <p className="p-5 text-center text-sm text-slate-400">Search is temporarily unavailable. Please try again.</p> : <div className="relative flex flex-col divide-y divide-slate-700/60 sm:flex-row sm:divide-x sm:divide-y-0" onMouseLeave={() => setHoveredColumn(null)}>
                   <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${activeColumn === "known" ? "sm:w-full" : activeColumn === "unknown" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("known")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-sky-300">Securities</p>{known.length ? known.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No securities found.</p>}</div>
-                  {includeUnknown && <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${activeColumn === "unknown" ? "sm:w-full" : activeColumn === "known" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("unknown")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{unknown.length ? unknown.map((result) => <SecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>}
+                  {includeUnknown && <div className={`min-w-0 overflow-hidden p-3 transition-[width] duration-700 ease-in-out ${activeColumn === "unknown" ? "sm:w-full" : activeColumn === "known" ? "sm:w-0" : "sm:w-1/2"}`} onMouseEnter={() => setHoveredColumn("unknown")}><p className="px-3 py-2 text-xs font-semibold uppercase tracking-wider text-violet-300">Unknown Securities</p>{addError && <p className="px-3 pb-2 text-sm text-rose-300" role="alert">Unable to add this security. Please try again.</p>}{unknown.length ? unknown.map((result) => <UnknownSecurityResult key={`${result.symbol}-${result.exchangeShortName}`} result={result} isAdding={addingSymbol === result.symbol} onAdd={addUnknownSecurity} />) : !isSearching && <p className="px-3 py-5 text-sm text-slate-500">No additional securities found.</p>}</div>}
                   {includeUnknown && hoveredColumn === null && <div className="pointer-events-auto absolute left-1/2 top-0 hidden h-full w-16 -translate-x-1/2 sm:block" onMouseEnter={() => setHoveredColumn(null)} aria-hidden="true" />}
                 </div>}
               </div>
