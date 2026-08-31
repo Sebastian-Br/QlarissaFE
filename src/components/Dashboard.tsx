@@ -110,11 +110,12 @@ function MoversCard({ title, icon: Icon, winners, losers, side }: { title: strin
   const strongestLoser = sortedLosers[sortedLosers.length - 1];
 
   return (
-    <section tabIndex={0} className={`group relative overflow-hidden rounded-2xl border border-sky-200/10 bg-slate-900/60 shadow-xl shadow-slate-950/20 backdrop-blur-sm xl:h-64 xl:w-20 xl:cursor-pointer xl:transition-[width,height] xl:duration-500 xl:ease-out xl:hover:h-[35rem] xl:hover:w-full xl:focus:h-[35rem] xl:focus:w-full ${side === "right" ? "xl:ml-auto" : ""}`}>
+    <section tabIndex={0} className={`group relative overflow-hidden rounded-2xl border border-sky-200/10 bg-slate-900/60 shadow-xl shadow-slate-950/20 backdrop-blur-sm xl:h-[36rem] xl:w-20 xl:cursor-pointer xl:transition-[width] xl:duration-500 xl:ease-out xl:hover:w-full xl:focus:w-full ${side === "right" ? "xl:ml-auto" : ""}`}>
       <div aria-hidden="true" className="absolute inset-0 hidden flex-col items-center justify-between py-7 xl:flex xl:transition-opacity xl:duration-200 xl:group-hover:pointer-events-none xl:group-hover:opacity-0 xl:group-focus:pointer-events-none xl:group-focus:opacity-0">
-        <div className="flex flex-col items-center gap-2"><span className="text-[10px] font-semibold tracking-[0.2em] text-slate-500 [writing-mode:vertical-rl]">TOP GAINER</span><MovementSignal mover={strongestWinner} compact /><span className="text-xs font-semibold text-emerald-300">{strongestWinner.symbol}</span></div>
-        <span className="h-px w-8 bg-slate-700/80" />
-        <div className="flex flex-col items-center gap-2"><span className="text-xs font-semibold text-rose-300">{strongestLoser.symbol}</span><MovementSignal mover={strongestLoser} compact /><span className="text-[10px] font-semibold tracking-[0.2em] text-slate-500 [writing-mode:vertical-rl]">TOP LOSS</span></div>
+        <Icon size={22} className="text-sky-300" />
+        <div className="flex flex-col items-center gap-1.5"><span className="!text-xs font-semibold text-emerald-300">{strongestWinner.symbol}</span><MovementSignal mover={strongestWinner} compact /></div>
+        <span className="!text-xs font-semibold tracking-[0.28em] text-slate-500 [writing-mode:vertical-rl]">MOVERS</span>
+        <div className="flex flex-col items-center gap-1.5"><MovementSignal mover={strongestLoser} compact /><span className="!text-xs font-semibold text-rose-300">{strongestLoser.symbol}</span></div>
       </div>
       <div className="p-5 xl:absolute xl:inset-0 xl:overflow-hidden xl:opacity-0 xl:transition-opacity xl:duration-200 xl:group-hover:opacity-100 xl:group-focus:opacity-100">
         <div className="mb-5 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-400/10 text-sky-300"><Icon size={20} /></span><div><h2 className="font-semibold text-slate-100">{title}</h2><p className="text-sm text-slate-400">Today&apos;s movement</p></div></div>
@@ -205,7 +206,7 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-[#02182c] text-slate-100">
-      <div className="mx-auto w-full max-w-[1440px] px-5 pb-12 pt-6 sm:px-8 lg:px-10">
+      <div className="mx-auto w-full max-w-[1600px] px-5 pb-12 pt-6 sm:px-8 lg:px-12">
         <header className="relative z-20 flex flex-col gap-5 border-b border-sky-100/10 pb-6 lg:grid lg:grid-cols-[minmax(150px,1fr)_minmax(620px,2.4fr)_minmax(150px,1fr)] lg:items-center">
           <a href="/dashboard" className="text-2xl font-bold tracking-tight text-white">Qlarissa<span className="text-sky-400">.</span></a>
           <div className="relative">
@@ -235,7 +236,7 @@ export default function Dashboard() {
 
         <section className="grid gap-5 py-8 xl:grid-cols-[1fr_1.45fr_1fr]">
           <MoversCard title="Daily watch list" icon={BarChart3} winners={marketWinners} losers={marketLosers} side="left" />
-          <div className="xl:order-3"><MoversCard title="Your holdings" icon={BriefcaseBusiness} winners={holdingWinners} losers={holdingLosers} side="right" /></div>
+          <div className="xl:order-3 xl:flex xl:justify-end"><MoversCard title="Your holdings" icon={BriefcaseBusiness} winners={holdingWinners} losers={holdingLosers} side="right" /></div>
           <section className="order-2 rounded-2xl border border-sky-200/10 bg-slate-900/60 p-7 shadow-xl shadow-slate-950/20 xl:row-span-1"><div><h2 className="font-semibold text-slate-100">Holdings</h2></div><div className="relative mx-auto my-8 h-72 w-72"><svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label="Holdings allocation chart">{(() => { let offset = 0; return holdingAllocation.map((holding) => { const currentOffset = offset; offset += holding.value; return <circle key={holding.symbol} cx="50" cy="50" r="37" fill="none" stroke={holding.color} strokeWidth="20" pathLength="100" strokeDasharray={`${holding.value} ${100 - holding.value}`} strokeDashoffset={-currentOffset} className={`cursor-pointer transition-opacity duration-200 ${hoveredHolding && hoveredHolding.symbol !== holding.symbol ? "opacity-35" : "opacity-100"}`} onMouseEnter={() => setHoveredHolding(holding)} onMouseLeave={() => setHoveredHolding(null)} />; }); })()}</svg><div className="pointer-events-none absolute inset-0 grid place-items-center rounded-full"><div className="grid h-48 w-48 place-items-center rounded-full bg-[#08243d] text-center"><p className="text-2xl font-semibold text-white">$24,860.40</p><p className="mt-2 flex items-center justify-center gap-1 !text-xs font-medium text-emerald-400"><ArrowUpRight size={14} />$438.20 (1.79%)</p></div></div>{hoveredHolding && <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-sky-200/20 bg-[#08243d] px-3 py-2 text-center shadow-xl"><p className="whitespace-nowrap !text-xs font-semibold text-white">{hoveredHolding.name}</p><p className="mt-0.5 !text-xs text-sky-300">{hoveredHolding.value}%</p></div>}<div className="mt-2 space-y-3">{holdingAllocation.slice(0, 5).map((holding) => <div key={holding.symbol} className="flex items-center gap-3"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: holding.color }} /><span className="min-w-0 flex-1 truncate !text-sm text-slate-300">{holding.name}</span><span className="!text-sm font-medium text-slate-100">{holding.value}%</span></div>)}</div></div></section>
         </section>
       </div>
