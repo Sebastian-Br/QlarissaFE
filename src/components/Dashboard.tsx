@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowRight, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
 import { addSecurity, searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
 
 interface Mover {
@@ -91,6 +91,9 @@ function UnknownSecurityResult({ result, isAdding, onAdd }: { result: SearchResu
 }
 
 function MoversCard({ title, icon: Icon, winners, losers }: { title: string; icon: typeof TrendingUp; winners: Mover[]; losers: Mover[] }) {
+  const sortedWinners = [...winners].sort((a, b) => b.change - a.change);
+  const sortedLosers = [...losers].sort((a, b) => b.change - a.change);
+
   return (
     <section className="rounded-2xl border border-sky-200/10 bg-slate-900/60 p-5 shadow-xl shadow-slate-950/20 backdrop-blur-sm">
       <div className="mb-5 flex items-center gap-3">
@@ -98,9 +101,9 @@ function MoversCard({ title, icon: Icon, winners, losers }: { title: string; ico
         <div><h2 className="font-semibold text-slate-100">{title}</h2><p className="text-sm text-slate-400">Today&apos;s movement</p></div>
       </div>
       <div className="space-y-1">
-        {winners.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}
+        {sortedWinners.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}
         <div className="my-3 border-t border-slate-700/70" />
-        {losers.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}
+        {sortedLosers.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}
       </div>
     </section>
   );
@@ -110,13 +113,14 @@ function MoverRow({ mover }: { mover: Mover }) {
   const positive = mover.change > 0;
   const magnitude = Math.abs(mover.change);
   const angle = Math.min((magnitude / 7) * 90, 90);
-  const arrowCount = magnitude > 7 ? Math.ceil(magnitude / 7) : 1;
-  const arrowClassName = magnitude >= 12 ? "animate-bounce" : undefined;
+  const isHighMovement = magnitude > 7;
+  const flyingArrowClass = positive ? "movement-arrow-fly-up" : "movement-arrow-fly-down";
+  const StaticArrow = isHighMovement ? (positive ? ArrowUp : ArrowDown) : ArrowRight;
 
   return (
     <div className="flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
       <p className="min-w-0 truncate font-medium text-slate-100">{mover.name}</p>
-      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}>{Array.from({ length: arrowCount }, (_, index) => <ArrowRight key={index} size={15} className={arrowClassName} style={{ transform: `rotate(${positive ? -angle : angle}deg)` }} />)}{magnitude.toFixed(2)}%</span></div>
+      <div className="flex shrink-0 items-center gap-4 text-right"><p className="text-sm text-slate-300">{mover.price}</p><span className={`flex min-w-18 items-center justify-end gap-0.5 text-sm font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}><span className="relative grid h-5 w-5 place-items-center"><StaticArrow size={15} style={!isHighMovement ? { transform: `rotate(${positive ? -angle : angle}deg)` } : undefined} />{isHighMovement && Array.from({ length: 2 }, (_, index) => { const FlyingArrow = positive ? ArrowUp : ArrowDown; return <FlyingArrow key={index} size={12} className={`pointer-events-none absolute ${flyingArrowClass}`} style={{ animationDelay: `${index * 0.7}s` }} />; })}</span>{magnitude.toFixed(2)}%</span></div>
     </div>
   );
 }
