@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Search, TrendingUp } from "lucide-react";
+import { ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Lock, Search, TrendingUp, Unlock } from "lucide-react";
 import { addSecurity, searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
 
 interface Mover {
@@ -104,21 +104,22 @@ function MovementSignal({ mover, compact = false }: { mover: Mover; compact?: bo
 }
 
 function MoversCard({ title, icon: Icon, winners, losers, side }: { title: string; icon: typeof TrendingUp; winners: Mover[]; losers: Mover[]; side: "left" | "right" }) {
+  const [locked, setLocked] = useState(false);
   const sortedWinners = [...winners].sort((a, b) => b.change - a.change);
   const sortedLosers = [...losers].sort((a, b) => b.change - a.change);
   const strongestWinner = sortedWinners[0];
   const strongestLoser = sortedLosers[sortedLosers.length - 1];
 
   return (
-    <section tabIndex={0} className={`group relative overflow-hidden rounded-2xl border border-sky-200/10 bg-slate-900/60 shadow-xl shadow-slate-950/20 backdrop-blur-sm xl:h-[36rem] xl:w-20 xl:cursor-pointer xl:z-10 xl:transition-[width] xl:duration-500 xl:ease-out xl:hover:w-[30rem] xl:focus:w-[30rem] ${side === "right" ? "xl:ml-auto" : ""}`}>
-      <div aria-hidden="true" className="absolute inset-0 hidden flex-col items-center justify-between py-7 xl:flex xl:transition-opacity xl:duration-200 xl:group-hover:pointer-events-none xl:group-hover:opacity-0 xl:group-focus:pointer-events-none xl:group-focus:opacity-0">
+    <section className={`group relative overflow-hidden rounded-2xl border border-sky-200/10 bg-slate-900/60 shadow-xl shadow-slate-950/20 backdrop-blur-sm xl:z-10 xl:h-[36rem] xl:w-20 xl:cursor-pointer xl:transition-[width] xl:duration-500 xl:ease-out xl:hover:w-[30rem] ${locked ? "xl:w-[30rem]" : ""} ${side === "right" ? "xl:ml-auto" : ""}`}>
+      <div aria-hidden="true" className={`absolute inset-0 hidden flex-col items-center justify-between py-7 xl:flex xl:transition-opacity xl:duration-200 xl:group-hover:pointer-events-none xl:group-hover:opacity-0 ${locked ? "pointer-events-none opacity-0" : ""}`}>
         <Icon size={22} className="text-sky-300" />
         <div className="flex flex-col items-center gap-1.5"><span className="!text-xs font-semibold text-emerald-300">{strongestWinner.symbol}</span><MovementSignal mover={strongestWinner} compact /></div>
         <span className="!text-xs font-semibold tracking-[0.28em] text-slate-500 [writing-mode:vertical-rl]">MOVERS</span>
         <div className="flex flex-col items-center gap-1.5"><MovementSignal mover={strongestLoser} compact /><span className="!text-xs font-semibold text-rose-300">{strongestLoser.symbol}</span></div>
       </div>
-      <div className="p-5 xl:absolute xl:inset-0 xl:overflow-hidden xl:opacity-0 xl:transition-opacity xl:duration-200 xl:group-hover:opacity-100 xl:group-focus:opacity-100">
-        <div className="mb-5 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-400/10 text-sky-300"><Icon size={20} /></span><div><h2 className="font-semibold text-slate-100">{title}</h2><p className="text-sm text-slate-400">Today&apos;s movement</p></div></div>
+      <div className={`p-5 xl:absolute xl:inset-0 xl:overflow-hidden xl:transition-opacity xl:duration-200 xl:group-hover:opacity-100 ${locked ? "opacity-100" : "xl:opacity-0"}`}>
+        <div className="mb-5 flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-sky-400/10 text-sky-300"><Icon size={20} /></span><div className="min-w-0 flex-1"><h2 className="font-semibold text-slate-100">{title}</h2><p className="text-sm text-slate-400">Today&apos;s movement</p></div><button type="button" aria-label={locked ? `Unlock ${title}` : `Lock ${title} open`} aria-pressed={locked} onClick={() => setLocked((current) => !current)} className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg transition-colors ${locked ? "bg-sky-400/20 text-sky-300 hover:bg-sky-400/30" : "text-slate-500 hover:bg-slate-800 hover:text-slate-200"}`}>{locked ? <Lock size={17} /> : <Unlock size={17} />}</button></div>
         <div className="space-y-1">{sortedWinners.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}<div className="my-3 border-t border-slate-700/70" />{sortedLosers.map((mover) => <MoverRow key={mover.symbol} mover={mover} />)}</div>
       </div>
     </section>
