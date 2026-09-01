@@ -206,7 +206,7 @@ export default function Dashboard() {
 
   return (
     <main className="min-h-screen bg-[#02182c] text-slate-100">
-      <div className="mx-auto w-full max-w-[1600px] px-5 pb-12 pt-6 sm:px-8 lg:px-12">
+      <div className="mx-auto w-full max-w-[1800px] px-5 pb-12 pt-6 sm:px-8 lg:px-12">
         <header className="relative z-20 flex flex-col gap-5 border-b border-sky-100/10 pb-6 lg:grid lg:grid-cols-[minmax(150px,1fr)_minmax(620px,2.4fr)_minmax(150px,1fr)] lg:items-center">
           <a href="/dashboard" className="text-2xl font-bold tracking-tight text-white">Qlarissa<span className="text-sky-400">.</span></a>
           <div className="relative">
