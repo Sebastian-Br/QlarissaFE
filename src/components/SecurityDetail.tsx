@@ -63,7 +63,11 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
   const min = canUseLog ? Math.log10(minValue) : minValue;
   const max = canUseLog ? Math.log10(maxValue) : maxValue;
   const range = max - min || 1;
-  const x = (index: number) => visibleHistory.length < 2 ? 54 : 9 + (index / (visibleHistory.length - 1)) * 88;
+  const calendarStart = Date.parse(`${visibleHistory[0]?.date}T00:00:00Z`);
+  const calendarEnd = Date.parse(`${visibleHistory.at(-1)?.date}T00:00:00Z`);
+  const calendarRange = Math.max(1, calendarEnd - calendarStart);
+  const x = (index: number) => visibleHistory.length < 2 ? 54 : xForDate(visibleHistory[index].date);
+  const xForDate = (date: string) => 8 + ((Date.parse(`${date}T00:00:00Z`) - calendarStart) / calendarRange) * 89;
   const y = (value: number) => 10 + ((max - (canUseLog ? Math.log10(value) : value)) / range) * 76;
   const path = visibleHistory.map((point, index) => `${index === 0 ? "M" : "L"} ${x(index)} ${y(point.average)}`).join(" ");
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
@@ -71,18 +75,22 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
     const value = canUseLog ? Math.max(1, Math.round(rawValue)) : Math.round(rawValue);
     return { ratio, value, position: y(value) };
   });
-  const xTickIndices = Array.from({ length: Math.min(8, visibleHistory.length) }, (_, index) => Math.round(index * (visibleHistory.length - 1) / (Math.min(8, visibleHistory.length) - 1)));
-  const useYearLabels = visibleHistory.length > 365 * 3;
-  const xTickLabel = (date: string) => useYearLabels ? date.slice(0, 4) : formatDate(date);
+  const firstYear = new Date(calendarStart).getUTCFullYear();
+  const lastYear = new Date(calendarEnd).getUTCFullYear();
+  const yearTicks = Array.from({ length: Math.max(1, lastYear - firstYear + 1) }, (_, index) => {
+    const year = firstYear + index;
+    const date = `${year}-01-01`;
+    return { year, date, position: xForDate(date) };
+  }).filter((tick) => tick.position >= 8 && tick.position <= 97);
   const getHover = (event: React.PointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
-    const chartX = Math.max(10, Math.min(97, ((event.clientX - box.left) / box.width) * 100));
+    const chartX = Math.max(8, Math.min(97, ((event.clientX - box.left) / box.width) * 100));
     const chartY = Math.max(10, Math.min(86, ((event.clientY - box.top) / box.height) * 100));
-    const index = Math.round(((chartX - 10) / 87) * (visibleHistory.length - 1));
+    const index = Math.round(((chartX - 8) / 89) * (visibleHistory.length - 1));
     const point = visibleHistory[Math.max(0, Math.min(visibleHistory.length - 1, index))];
     const pointX = x(index);
     const pointY = y(point.average);
-    const distance = Math.hypot((chartX - pointX) / 87, (chartY - pointY) / 76);
+    const distance = Math.hypot((chartX - pointX) / 89, (chartY - pointY) / 76);
     return distance <= 0.06 ? { point, x: event.clientX - box.left, y: event.clientY - box.top } : null;
   };
   const updateHover = (event: React.PointerEvent<HTMLDivElement>) => setHovered(getHover(event));
@@ -111,10 +119,10 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
     <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start"><div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-400/15 text-sky-300"><LineChart size={19} /></span><div><h2 className="font-semibold text-white">Price history</h2><p className="text-sm text-slate-400">Scroll to zoom · drag to explore</p></div></div></div><div className="flex flex-wrap items-end gap-3"><label className="grid gap-1 text-xs font-medium text-slate-400">Start<input aria-label="Chart start date" type="date" value={startDate} min={history[0]?.date} max={endDate || undefined} onChange={(event) => { setStartDate(event.target.value); setPan(0); }} className="h-9 rounded-lg border border-sky-200/15 bg-[#08243d] px-2 text-sm text-slate-100 outline-none focus:border-sky-400" /></label><label className="grid gap-1 text-xs font-medium text-slate-400">End<input aria-label="Chart end date" type="date" value={endDate} min={startDate || undefined} max={history.at(-1)?.date} onChange={(event) => { setEndDate(event.target.value); setPan(0); }} className="h-9 rounded-lg border border-sky-200/15 bg-[#08243d] px-2 text-sm text-slate-100 outline-none focus:border-sky-400" /></label><button type="button" aria-label="Toggle logarithmic scale" aria-pressed={logScale} onClick={() => setLogScale((current) => !current)} className={`h-9 rounded-lg px-3 text-sm font-semibold transition-colors ${logScale ? "bg-sky-400 text-slate-950" : "border border-sky-200/15 text-slate-300 hover:bg-slate-800"}`}><LineChart size={15} />{logScale ? "Log" : "Linear"}</button></div></div>
     {visibleHistory.length > 1 ? <div ref={chartRef} className="relative mt-8 h-[390px] cursor-grab touch-none select-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3 active:cursor-grabbing" onPointerLeave={() => setHovered(null)} onPointerMove={handlePointerMove} onPointerDown={(event) => { event.preventDefault(); setHovered(getHover(event)); dragRef.current = { x: event.clientX, pan }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={(event) => { event.preventDefault(); const next = getHover(event); const wasClick = dragRef.current && Math.abs(event.clientX - dragRef.current.x) < 5; dragRef.current = null; setHovered(next); if (wasClick) setSelected((current) => !next ? null : current?.point.id === next.point.id ? null : next); event.currentTarget.releasePointerCapture(event.pointerId); }}>
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${security.name} price history chart`} className="pointer-events-none h-full w-full overflow-visible">
-        {yTicks.map(({ ratio, position }) => <line key={ratio} x1="9" x2="97" y1={position} y2={position} stroke="#7dd3fc" strokeOpacity="0.12" vectorEffect="non-scaling-stroke" />)}
-        <line x1="9" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><line x1="9" x2="9" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><path d={path} fill="none" stroke="#38bdf8" strokeWidth="0.75" vectorEffect="non-scaling-stroke" />{xTickIndices.map((index) => <line key={`tick-${index}`} x1={x(index)} x2={x(index)} y1="86" y2="89" stroke="#7dd3fc" strokeOpacity="0.5" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />)}{hovered && <circle cx={x(visibleHistory.findIndex((point) => point.id === hovered.point.id))} cy={y(hovered.point.average)} r="1.35" fill="#38bdf8" style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}{selected && <circle cx={x(visibleHistory.findIndex((point) => point.id === selected.point.id))} cy={y(selected.point.average)} r="1.55" fill="#7dd3fc" style={{ filter: "drop-shadow(0 0 8px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}
-      </svg><div className="pointer-events-none absolute bottom-[10%] left-0 top-[10%] w-[9%] text-right text-[10px] text-slate-500">{yTicks.map(({ value, ratio, position }) => <span key={ratio} className="absolute right-0 -translate-y-1/2" style={{ top: `${((position - 10) / 76) * 100}%` }}>{axisNumberFormatter.format(value)}</span>)}</div>
-      <div className="pointer-events-none absolute bottom-[3%] left-[9%] right-[3%] flex justify-between text-[10px] text-slate-500">{xTickIndices.map((index) => <span key={index} className="text-center" style={{ width: `${100 / xTickIndices.length}%` }}>{xTickLabel(visibleHistory[index].date)}</span>)}</div>
+        {yTicks.map(({ ratio, position }) => <line key={ratio} x1="8" x2="97" y1={position} y2={position} stroke="#7dd3fc" strokeOpacity="0.12" vectorEffect="non-scaling-stroke" />)}
+        <line x1="8" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><line x1="8" x2="8" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><path d={path} fill="none" stroke="#38bdf8" strokeWidth="0.75" vectorEffect="non-scaling-stroke" />{yearTicks.map((tick) => <line key={`tick-${tick.year}`} x1={tick.position} x2={tick.position} y1="86" y2="89" stroke="#7dd3fc" strokeOpacity="0.5" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />)}{hovered && <circle cx={x(visibleHistory.findIndex((point) => point.id === hovered.point.id))} cy={y(hovered.point.average)} r="1.35" fill="#38bdf8" style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}{selected && <circle cx={x(visibleHistory.findIndex((point) => point.id === selected.point.id))} cy={y(selected.point.average)} r="1.55" fill="#7dd3fc" style={{ filter: "drop-shadow(0 0 8px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}
+      </svg><div className="pointer-events-none absolute bottom-[10%] left-0 top-[10%] w-[8%] text-right text-[10px] text-slate-500">{yTicks.map(({ value, ratio, position }) => <span key={ratio} className="absolute right-0 -translate-y-1/2" style={{ top: `${((position - 10) / 76) * 100}%` }}>{axisNumberFormatter.format(value)}</span>)}</div>
+      <div className="pointer-events-none absolute bottom-[3%] left-[8%] right-[3%] text-[10px] text-slate-500">{yearTicks.map((tick) => <span key={tick.year} className="absolute -translate-x-1/2 text-center" style={{ left: `${((tick.position - 8) / 89) * 100}%` }}>{tick.year}</span>)}</div>
       {selected && <div className="pointer-events-none absolute z-10 min-w-[132px] -translate-x-1/2 -translate-y-full rounded-lg border border-sky-200/20 bg-[#08243d]/80 px-2.5 py-2 opacity-90 shadow-xl" style={{ left: selected.x, top: Math.max(76, selected.y - 8) }}><p className="text-[10px] text-slate-400">{formatDate(selected.point.date)}</p><p className="font-semibold text-white">{formatPrice(selected.point.average, security)}</p><p className="text-[10px] text-slate-400">High {formatPrice(selected.point.high, security)} · Low {formatPrice(selected.point.low, security)}</p></div>}
     </div> : <div className="mt-8 grid h-[360px] place-items-center rounded-xl border border-dashed border-sky-200/15 bg-[#061d32] text-center"><div><Info className="mx-auto text-sky-300" size={22} /><p className="mt-3 font-medium text-slate-200">Not enough price data</p><p className="mt-1 text-sm text-slate-500">At least two daily prices are needed to draw the chart.</p></div></div>}
   </section>;
