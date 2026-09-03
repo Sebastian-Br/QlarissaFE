@@ -14,6 +14,7 @@ const typeNames: Record<SecurityType, string> = {
 const dateFormatter = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" });
 const dateTimeFormatter = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "medium", timeZone: "UTC" });
 const numberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 });
+const axisNumberFormatter = new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 });
 const compactFormatter = new Intl.NumberFormat(undefined, { notation: "compact", maximumFractionDigits: 2 });
 
 function formatDate(value: string) {
@@ -57,14 +58,22 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
   const visibleHistory = filteredHistory.slice(windowStart, windowStart + pointCount);
   const values = visibleHistory.map((item) => item.average).filter((value) => Number.isFinite(value));
   const canUseLog = logScale && values.every((value) => value > 0);
-  const transformedValues = values.map((value) => canUseLog ? Math.log10(value) : value);
-  const min = Math.min(...transformedValues, 0);
-  const max = Math.max(...transformedValues, 1);
+  const minValue = Math.min(...values);
+  const maxValue = Math.max(...values);
+  const min = canUseLog ? Math.log10(minValue) : minValue;
+  const max = canUseLog ? Math.log10(maxValue) : maxValue;
   const range = max - min || 1;
-  const x = (index: number) => visibleHistory.length < 2 ? 55 : 10 + (index / (visibleHistory.length - 1)) * 87;
+  const x = (index: number) => visibleHistory.length < 2 ? 54 : 9 + (index / (visibleHistory.length - 1)) * 88;
   const y = (value: number) => 10 + ((max - (canUseLog ? Math.log10(value) : value)) / range) * 76;
   const path = visibleHistory.map((point, index) => `${index === 0 ? "M" : "L"} ${x(index)} ${y(point.average)}`).join(" ");
-  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => ({ ratio, value: canUseLog ? 10 ** (min + range * ratio) : min + range * ratio }));
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+    const rawValue = canUseLog ? 10 ** (min + range * ratio) : min + range * ratio;
+    const value = canUseLog ? Math.max(1, Math.round(rawValue)) : Math.round(rawValue);
+    return { ratio, value, position: y(value) };
+  });
+  const xTickIndices = Array.from({ length: Math.min(8, visibleHistory.length) }, (_, index) => Math.round(index * (visibleHistory.length - 1) / (Math.min(8, visibleHistory.length) - 1)));
+  const useYearLabels = visibleHistory.length > 365 * 3;
+  const xTickLabel = (date: string) => useYearLabels ? date.slice(0, 4) : formatDate(date);
   const getHover = (event: React.PointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     const chartX = Math.max(10, Math.min(97, ((event.clientX - box.left) / box.width) * 100));
@@ -102,10 +111,10 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
     <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start"><div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-400/15 text-sky-300"><LineChart size={19} /></span><div><h2 className="font-semibold text-white">Price history</h2><p className="text-sm text-slate-400">Scroll to zoom · drag to explore</p></div></div></div><div className="flex flex-wrap items-end gap-3"><label className="grid gap-1 text-xs font-medium text-slate-400">Start<input aria-label="Chart start date" type="date" value={startDate} min={history[0]?.date} max={endDate || undefined} onChange={(event) => { setStartDate(event.target.value); setPan(0); }} className="h-9 rounded-lg border border-sky-200/15 bg-[#08243d] px-2 text-sm text-slate-100 outline-none focus:border-sky-400" /></label><label className="grid gap-1 text-xs font-medium text-slate-400">End<input aria-label="Chart end date" type="date" value={endDate} min={startDate || undefined} max={history.at(-1)?.date} onChange={(event) => { setEndDate(event.target.value); setPan(0); }} className="h-9 rounded-lg border border-sky-200/15 bg-[#08243d] px-2 text-sm text-slate-100 outline-none focus:border-sky-400" /></label><button type="button" aria-label="Toggle logarithmic scale" aria-pressed={logScale} onClick={() => setLogScale((current) => !current)} className={`h-9 rounded-lg px-3 text-sm font-semibold transition-colors ${logScale ? "bg-sky-400 text-slate-950" : "border border-sky-200/15 text-slate-300 hover:bg-slate-800"}`}><LineChart size={15} />{logScale ? "Log" : "Linear"}</button></div></div>
     {visibleHistory.length > 1 ? <div ref={chartRef} className="relative mt-8 h-[390px] cursor-grab touch-none select-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3 active:cursor-grabbing" onPointerLeave={() => setHovered(null)} onPointerMove={handlePointerMove} onPointerDown={(event) => { event.preventDefault(); setHovered(getHover(event)); dragRef.current = { x: event.clientX, pan }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={(event) => { event.preventDefault(); const next = getHover(event); const wasClick = dragRef.current && Math.abs(event.clientX - dragRef.current.x) < 5; dragRef.current = null; setHovered(next); if (wasClick) setSelected((current) => !next ? null : current?.point.id === next.point.id ? null : next); event.currentTarget.releasePointerCapture(event.pointerId); }}>
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${security.name} price history chart`} className="pointer-events-none h-full w-full overflow-visible">
-        {yTicks.map(({ ratio }) => <line key={ratio} x1="10" x2="97" y1={10 + (1 - ratio) * 76} y2={10 + (1 - ratio) * 76} stroke="#7dd3fc" strokeOpacity="0.12" vectorEffect="non-scaling-stroke" />)}
-        <line x1="10" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><line x1="10" x2="10" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><path d={path} fill="none" stroke="#38bdf8" strokeWidth="0.75" vectorEffect="non-scaling-stroke" />{hovered && <circle cx={x(visibleHistory.findIndex((point) => point.id === hovered.point.id))} cy={y(hovered.point.average)} r="1.35" fill="#38bdf8" style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}{selected && <circle cx={x(visibleHistory.findIndex((point) => point.id === selected.point.id))} cy={y(selected.point.average)} r="1.55" fill="#7dd3fc" style={{ filter: "drop-shadow(0 0 8px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}
-      </svg><div className="pointer-events-none absolute bottom-[10%] left-0 top-[10%] flex w-[10%] flex-col justify-between text-right text-[10px] text-slate-500">{yTicks.slice().reverse().map(({ value, ratio }) => <span key={ratio}>{numberFormatter.format(value)}</span>)}</div>
-      <div className="pointer-events-none absolute bottom-[4%] left-[10%] right-[3%] flex justify-between text-[10px] text-slate-500"><span>{formatDate(visibleHistory[0].date)}</span><span>{formatDate(visibleHistory[Math.floor((visibleHistory.length - 1) / 2)].date)}</span><span>{formatDate(visibleHistory.at(-1)!.date)}</span></div>
+        {yTicks.map(({ ratio, position }) => <line key={ratio} x1="9" x2="97" y1={position} y2={position} stroke="#7dd3fc" strokeOpacity="0.12" vectorEffect="non-scaling-stroke" />)}
+        <line x1="9" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><line x1="9" x2="9" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><path d={path} fill="none" stroke="#38bdf8" strokeWidth="0.75" vectorEffect="non-scaling-stroke" />{xTickIndices.map((index) => <line key={`tick-${index}`} x1={x(index)} x2={x(index)} y1="86" y2="89" stroke="#7dd3fc" strokeOpacity="0.5" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />)}{hovered && <circle cx={x(visibleHistory.findIndex((point) => point.id === hovered.point.id))} cy={y(hovered.point.average)} r="1.35" fill="#38bdf8" style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}{selected && <circle cx={x(visibleHistory.findIndex((point) => point.id === selected.point.id))} cy={y(selected.point.average)} r="1.55" fill="#7dd3fc" style={{ filter: "drop-shadow(0 0 8px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}
+      </svg><div className="pointer-events-none absolute bottom-[10%] left-0 top-[10%] w-[9%] text-right text-[10px] text-slate-500">{yTicks.map(({ value, ratio, position }) => <span key={ratio} className="absolute right-0 -translate-y-1/2" style={{ top: `${((position - 10) / 76) * 100}%` }}>{axisNumberFormatter.format(value)}</span>)}</div>
+      <div className="pointer-events-none absolute bottom-[3%] left-[9%] right-[3%] flex justify-between text-[10px] text-slate-500">{xTickIndices.map((index) => <span key={index} className="text-center" style={{ width: `${100 / xTickIndices.length}%` }}>{xTickLabel(visibleHistory[index].date)}</span>)}</div>
       {selected && <div className="pointer-events-none absolute z-10 min-w-[132px] -translate-x-1/2 -translate-y-full rounded-lg border border-sky-200/20 bg-[#08243d]/80 px-2.5 py-2 opacity-90 shadow-xl" style={{ left: selected.x, top: Math.max(76, selected.y - 8) }}><p className="text-[10px] text-slate-400">{formatDate(selected.point.date)}</p><p className="font-semibold text-white">{formatPrice(selected.point.average, security)}</p><p className="text-[10px] text-slate-400">High {formatPrice(selected.point.high, security)} · Low {formatPrice(selected.point.low, security)}</p></div>}
     </div> : <div className="mt-8 grid h-[360px] place-items-center rounded-xl border border-dashed border-sky-200/15 bg-[#061d32] text-center"><div><Info className="mx-auto text-sky-300" size={22} /><p className="mt-3 font-medium text-slate-200">Not enough price data</p><p className="mt-1 text-sm text-slate-500">At least two daily prices are needed to draw the chart.</p></div></div>}
   </section>;
