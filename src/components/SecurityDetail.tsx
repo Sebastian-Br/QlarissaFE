@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, ExternalLink, Info, LineChart, RefreshCw } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getSecurity } from "@/api/securityApi";
@@ -39,6 +39,8 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState(0);
   const [hovered, setHovered] = useState<{ point: DailyPrice; x: number; y: number } | null>(null);
+  const [selected, setSelected] = useState<{ point: DailyPrice; x: number; y: number } | null>(null);
+  const chartRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; pan: number } | null>(null);
 
   useEffect(() => {
@@ -63,18 +65,21 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
   const y = (value: number) => 86 - (((canUseLog ? Math.log10(value) : value) - min) / range) * 76;
   const path = visibleHistory.map((point, index) => `${index === 0 ? "M" : "L"} ${x(index)} ${y(point.average)}`).join(" ");
   const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => ({ ratio, value: canUseLog ? 10 ** (min + range * ratio) : min + range * ratio }));
-  const updateHover = (event: React.PointerEvent<HTMLDivElement>) => {
+  const getHover = (event: React.PointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     const chartX = Math.max(10, Math.min(97, ((event.clientX - box.left) / box.width) * 100));
     const index = Math.round(((chartX - 10) / 87) * (visibleHistory.length - 1));
     const point = visibleHistory[Math.max(0, Math.min(visibleHistory.length - 1, index))];
-    setHovered({ point, x: event.clientX - box.left, y: event.clientY - box.top });
+    return { point, x: event.clientX - box.left, y: event.clientY - box.top };
   };
-  const handleWheel = (event: React.WheelEvent<HTMLDivElement>) => {
+  const updateHover = (event: React.PointerEvent<HTMLDivElement>) => setHovered(getHover(event));
+  const handleWheel = useCallback((event: WheelEvent) => {
     event.preventDefault();
-    setZoom((current) => Math.max(1, Math.min(32, current * (event.deltaY > 0 ? 0.75 : 1.33))));
-    setPan((current) => Math.min(current, Math.max(0, filteredHistory.length - Math.max(2, Math.ceil(filteredHistory.length / (event.deltaY > 0 ? 0.75 : 1.33))))));
-  };
+    event.stopPropagation();
+    const factor = event.deltaY > 0 ? 0.75 : 1.33;
+    setZoom((current) => Math.max(1, Math.min(32, current * factor)));
+    setPan((current) => Math.min(current, Math.max(0, filteredHistory.length - Math.max(2, Math.ceil(filteredHistory.length / factor)))));
+  }, [filteredHistory.length]);
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     updateHover(event);
     if (!dragRef.current) return;
@@ -82,18 +87,23 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
     const pointDelta = Math.round(((event.clientX - dragRef.current.x) / box.width) * filteredHistory.length);
     setPan(Math.max(0, Math.min(maxPan, dragRef.current.pan + pointDelta)));
   };
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.addEventListener("wheel", handleWheel, { passive: false });
+    return () => chart.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
 
   return <section className="rounded-2xl border border-sky-200/15 bg-slate-900/60 p-5 shadow-xl shadow-slate-950/20 backdrop-blur-sm sm:p-7">
-    <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start"><div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-400/15 text-sky-300"><LineChart size={19} /></span><div><h2 className="font-semibold text-white">Price history</h2><p className="text-sm text-slate-400">Scroll to zoom · drag to explore</p></div></div></div><div className="flex flex-wrap items-end gap-3"><label className="grid gap-1 text-xs font-medium text-slate-400">Start<input aria-label="Chart start date" type="date" value={startDate} min={history[0]?.date} max={endDate || undefined} onChange={(event) => { setStartDate(event.target.value); setPan(0); }} className="h-9 rounded-lg border border-sky-200/15 bg-[#08243d] px-2 text-sm text-slate-100 outline-none focus:border-sky-400" /></label><label className="grid gap-1 text-xs font-medium text-slate-400">End<input aria-label="Chart end date" type="date" value={endDate} min={startDate || undefined} max={history.at(-1)?.date} onChange={(event) => { setEndDate(event.target.value); setPan(0); }} className="h-9 rounded-lg border border-sky-200/15 bg-[#08243d] px-2 text-sm text-slate-100 outline-none focus:border-sky-400" /></label><button type="button" aria-label="Toggle logarithmic scale" aria-pressed={logScale} onClick={() => setLogScale((current) => !current)} className={`h-9 rounded-lg px-3 text-sm font-semibold transition-colors ${logScale ? "bg-sky-400 text-slate-950" : "border border-sky-200/15 text-slate-300 hover:bg-slate-800"}`}>Log scale</button></div></div>
-    {visibleHistory.length > 1 ? <div className="relative mt-8 h-[390px] cursor-grab touch-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3 active:cursor-grabbing" onWheel={handleWheel} onPointerLeave={() => setHovered(null)} onPointerMove={handlePointerMove} onPointerDown={(event) => { dragRef.current = { x: event.clientX, pan }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={(event) => { dragRef.current = null; event.currentTarget.releasePointerCapture(event.pointerId); }}>
-      <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${security.name} price history chart`} className="h-full w-full overflow-visible">
-        {yTicks.map(({ ratio, value }) => <g key={ratio}><line x1="10" x2="97" y1={86 - ratio * 76} y2={86 - ratio * 76} stroke="#7dd3fc" strokeOpacity="0.12" vectorEffect="non-scaling-stroke" /><text x="8" y={86 - ratio * 76 + 1.5} textAnchor="end" fill="#94a3b8" fontSize="3" vectorEffect="non-scaling-stroke">{numberFormatter.format(value)}</text></g>)}
-        <line x1="10" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><line x1="10" x2="10" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><path d={path} fill="none" stroke="#38bdf8" strokeWidth="0.75" vectorEffect="non-scaling-stroke" />
-        {[0, Math.floor((visibleHistory.length - 1) / 2), visibleHistory.length - 1].map((index) => <text key={index} x={x(index)} y="94" textAnchor={index === 0 ? "start" : index === visibleHistory.length - 1 ? "end" : "middle"} fill="#94a3b8" fontSize="3" vectorEffect="non-scaling-stroke">{formatDate(visibleHistory[index].date)}</text>)}
-      </svg>
-      {hovered && <div className="pointer-events-none absolute z-10 min-w-[132px] -translate-x-1/2 -translate-y-full rounded-lg border border-sky-200/20 bg-[#08243d]/95 px-2.5 py-2 shadow-xl" style={{ left: hovered.x, top: Math.max(76, hovered.y - 8) }}><p className="text-[10px] text-slate-400">{formatDate(hovered.point.date)}</p><p className="font-semibold text-white">{formatPrice(hovered.point.average, security)}</p><p className="text-[10px] text-slate-400">High {formatPrice(hovered.point.high, security)} · Low {formatPrice(hovered.point.low, security)}</p></div>}
+    <div className="flex flex-col justify-between gap-5 xl:flex-row xl:items-start"><div><div className="flex items-center gap-2"><span className="grid h-9 w-9 place-items-center rounded-xl bg-sky-400/15 text-sky-300"><LineChart size={19} /></span><div><h2 className="font-semibold text-white">Price history</h2><p className="text-sm text-slate-400">Scroll to zoom · drag to explore</p></div></div></div><div className="flex flex-wrap items-end gap-3"><label className="grid gap-1 text-xs font-medium text-slate-400">Start<input aria-label="Chart start date" type="date" value={startDate} min={history[0]?.date} max={endDate || undefined} onChange={(event) => { setStartDate(event.target.value); setPan(0); }} className="h-9 rounded-lg border border-sky-200/15 bg-[#08243d] px-2 text-sm text-slate-100 outline-none focus:border-sky-400" /></label><label className="grid gap-1 text-xs font-medium text-slate-400">End<input aria-label="Chart end date" type="date" value={endDate} min={startDate || undefined} max={history.at(-1)?.date} onChange={(event) => { setEndDate(event.target.value); setPan(0); }} className="h-9 rounded-lg border border-sky-200/15 bg-[#08243d] px-2 text-sm text-slate-100 outline-none focus:border-sky-400" /></label><button type="button" aria-label="Toggle logarithmic scale" aria-pressed={logScale} onClick={() => setLogScale((current) => !current)} className={`h-9 rounded-lg px-3 text-sm font-semibold transition-colors ${logScale ? "bg-sky-400 text-slate-950" : "border border-sky-200/15 text-slate-300 hover:bg-slate-800"}`}><LineChart size={15} />{logScale ? "Log" : "Linear"}</button></div></div>
+    {visibleHistory.length > 1 ? <div ref={chartRef} className="relative mt-8 h-[390px] cursor-grab touch-none select-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3 active:cursor-grabbing" onPointerLeave={() => setHovered(null)} onPointerMove={handlePointerMove} onPointerDown={(event) => { event.preventDefault(); setHovered(getHover(event)); dragRef.current = { x: event.clientX, pan }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={(event) => { event.preventDefault(); const next = getHover(event); const wasClick = dragRef.current && Math.abs(event.clientX - dragRef.current.x) < 5; dragRef.current = null; setHovered(next); if (wasClick) setSelected((current) => current?.point.id === next.point.id ? null : next); event.currentTarget.releasePointerCapture(event.pointerId); }}>
+      <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${security.name} price history chart`} className="pointer-events-none h-full w-full overflow-visible">
+        {yTicks.map(({ ratio }) => <line key={ratio} x1="10" x2="97" y1={86 - ratio * 76} y2={86 - ratio * 76} stroke="#7dd3fc" strokeOpacity="0.12" vectorEffect="non-scaling-stroke" />)}
+        <line x1="10" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><line x1="10" x2="10" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><path d={path} fill="none" stroke="#38bdf8" strokeWidth="0.75" vectorEffect="non-scaling-stroke" />{hovered && <circle cx={x(visibleHistory.findIndex((point) => point.id === hovered.point.id))} cy={y(hovered.point.average)} r="1.1" fill="#e0f2fe" vectorEffect="non-scaling-stroke" />}
+      </svg><div className="pointer-events-none absolute bottom-[13%] left-2 top-[10%] flex w-11 flex-col justify-between text-right text-[10px] text-slate-500">{yTicks.map(({ value, ratio }) => <span key={ratio}>{numberFormatter.format(value)}</span>)}</div>
+      <div className="pointer-events-none absolute bottom-2 left-[12%] right-[3%] flex justify-between text-[10px] text-slate-500"><span>{formatDate(visibleHistory[0].date)}</span><span>{formatDate(visibleHistory[Math.floor((visibleHistory.length - 1) / 2)].date)}</span><span>{formatDate(visibleHistory.at(-1)!.date)}</span></div>
+      {selected && <div className="pointer-events-none absolute z-10 min-w-[132px] -translate-x-1/2 -translate-y-full rounded-lg border border-sky-200/20 bg-[#08243d]/80 px-2.5 py-2 opacity-90 shadow-xl" style={{ left: selected.x, top: Math.max(76, selected.y - 8) }}><p className="text-[10px] text-slate-400">{formatDate(selected.point.date)}</p><p className="font-semibold text-white">{formatPrice(selected.point.average, security)}</p><p className="text-[10px] text-slate-400">High {formatPrice(selected.point.high, security)} · Low {formatPrice(selected.point.low, security)}</p></div>}
     </div> : <div className="mt-8 grid h-[360px] place-items-center rounded-xl border border-dashed border-sky-200/15 bg-[#061d32] text-center"><div><Info className="mx-auto text-sky-300" size={22} /><p className="mt-3 font-medium text-slate-200">Not enough price data</p><p className="mt-1 text-sm text-slate-500">At least two daily prices are needed to draw the chart.</p></div></div>}
-    <div className="mt-4 flex items-center justify-between text-xs text-slate-500"><span>{visibleHistory.length} of {filteredHistory.length} data points</span><span>{canUseLog ? "Logarithmic scale" : "Linear scale"}</span></div>
   </section>;
 }
 
