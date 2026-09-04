@@ -52,19 +52,23 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
   }, [history]);
 
   const filteredHistory = useMemo(() => history.filter((price) => (!startDate || price.date >= startDate) && (!endDate || price.date <= endDate)), [endDate, history, startDate]);
-  const pointCount = Math.max(2, Math.ceil(filteredHistory.length / zoom));
+  const pointCount = filteredHistory.length ? Math.min(filteredHistory.length, Math.max(2, Math.ceil(filteredHistory.length / zoom))) : 0;
   const maxPan = Math.max(0, filteredHistory.length - pointCount);
   const windowStart = Math.max(0, filteredHistory.length - pointCount - pan);
   const visibleHistory = filteredHistory.slice(windowStart, windowStart + pointCount);
+  useEffect(() => {
+    if (selected && !visibleHistory.some((point) => point.id === selected.point.id)) setSelected(null);
+    if (hovered && !visibleHistory.some((point) => point.id === hovered.point.id)) setHovered(null);
+  }, [hovered, selected, visibleHistory]);
   const values = visibleHistory.map((item) => item.average).filter((value) => Number.isFinite(value));
-  const canUseLog = logScale && values.every((value) => value > 0);
-  const minValue = Math.min(...values);
-  const maxValue = Math.max(...values);
+  const canUseLog = logScale && values.length > 0 && values.every((value) => value > 0);
+  const minValue = values.length ? Math.min(...values) : 1;
+  const maxValue = values.length ? Math.max(...values) : 1;
   const min = canUseLog ? Math.log10(minValue) : minValue;
   const max = canUseLog ? Math.log10(maxValue) : maxValue;
   const range = max - min || 1;
-  const calendarStart = Date.parse(`${visibleHistory[0]?.date}T00:00:00Z`);
-  const calendarEnd = Date.parse(`${visibleHistory.at(-1)?.date}T00:00:00Z`);
+  const calendarStart = Date.parse(`${visibleHistory[0]?.date}T00:00:00Z`) || Date.now();
+  const calendarEnd = Date.parse(`${visibleHistory.at(-1)?.date}T00:00:00Z`) || calendarStart + 86_400_000;
   const calendarRange = Math.max(1, calendarEnd - calendarStart);
   const x = (index: number) => visibleHistory.length < 2 ? 54 : xForDate(visibleHistory[index].date);
   const xForDate = (date: string) => 8 + ((Date.parse(`${date}T00:00:00Z`) - calendarStart) / calendarRange) * 89;
@@ -88,6 +92,7 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
     const chartY = Math.max(10, Math.min(86, ((event.clientY - box.top) / box.height) * 100));
     const index = Math.round(((chartX - 8) / 89) * (visibleHistory.length - 1));
     const point = visibleHistory[Math.max(0, Math.min(visibleHistory.length - 1, index))];
+    if (!point) return null;
     const pointX = x(index);
     const pointY = y(point.average);
     const distance = Math.hypot((chartX - pointX) / 89, (chartY - pointY) / 76);
@@ -120,7 +125,7 @@ function Chart({ security }: { security: PubliclyTradedSecurityBase }) {
     {visibleHistory.length > 1 ? <div ref={chartRef} className="relative mt-8 h-[390px] cursor-grab touch-none select-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3 active:cursor-grabbing" onPointerLeave={() => setHovered(null)} onPointerMove={handlePointerMove} onPointerDown={(event) => { event.preventDefault(); setHovered(getHover(event)); dragRef.current = { x: event.clientX, pan }; event.currentTarget.setPointerCapture(event.pointerId); }} onPointerUp={(event) => { event.preventDefault(); const next = getHover(event); const wasClick = dragRef.current && Math.abs(event.clientX - dragRef.current.x) < 5; dragRef.current = null; setHovered(next); if (wasClick) setSelected((current) => !next ? null : current?.point.id === next.point.id ? null : next); event.currentTarget.releasePointerCapture(event.pointerId); }}>
       <svg viewBox="0 0 100 100" preserveAspectRatio="none" role="img" aria-label={`${security.name} price history chart`} className="pointer-events-none h-full w-full overflow-visible">
         {yTicks.map(({ ratio, position }) => <line key={ratio} x1="8" x2="97" y1={position} y2={position} stroke="#7dd3fc" strokeOpacity="0.12" vectorEffect="non-scaling-stroke" />)}
-        <line x1="8" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><line x1="8" x2="8" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><path d={path} fill="none" stroke="#38bdf8" strokeWidth="0.75" vectorEffect="non-scaling-stroke" />{yearTicks.map((tick) => <line key={`tick-${tick.year}`} x1={tick.position} x2={tick.position} y1="86" y2="89" stroke="#7dd3fc" strokeOpacity="0.5" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />)}{hovered && <circle cx={x(visibleHistory.findIndex((point) => point.id === hovered.point.id))} cy={y(hovered.point.average)} r="1.35" fill="#38bdf8" style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}{selected && <circle cx={x(visibleHistory.findIndex((point) => point.id === selected.point.id))} cy={y(selected.point.average)} r="1.55" fill="#7dd3fc" style={{ filter: "drop-shadow(0 0 8px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}
+        <line x1="8" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><line x1="8" x2="8" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" /><path d={path} fill="none" stroke="#38bdf8" strokeWidth="0.75" vectorEffect="non-scaling-stroke" />{yearTicks.map((tick) => <line key={`tick-${tick.year}`} x1={tick.position} x2={tick.position} y1="86" y2="89" stroke="#7dd3fc" strokeOpacity="0.5" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />)}{hovered && visibleHistory.some((point) => point.id === hovered.point.id) && <circle cx={x(visibleHistory.findIndex((point) => point.id === hovered.point.id))} cy={y(hovered.point.average)} r="1.35" fill="#38bdf8" style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}{selected && visibleHistory.some((point) => point.id === selected.point.id) && <circle cx={x(visibleHistory.findIndex((point) => point.id === selected.point.id))} cy={y(selected.point.average)} r="1.55" fill="#7dd3fc" style={{ filter: "drop-shadow(0 0 8px #38bdf8)" }} vectorEffect="non-scaling-stroke" />}
       </svg><div className="pointer-events-none absolute bottom-[10%] left-0 top-[10%] w-[8%] text-right text-[10px] text-slate-500">{yTicks.map(({ value, ratio, position }) => <span key={ratio} className="absolute right-0 -translate-y-1/2" style={{ top: `${((position - 10) / 76) * 100}%` }}>{axisNumberFormatter.format(value)}</span>)}</div>
       <div className="pointer-events-none absolute bottom-[3%] left-[8%] right-[3%] text-[10px] text-slate-500">{yearTicks.map((tick) => <span key={tick.year} className="absolute -translate-x-1/2 text-center" style={{ left: `${((tick.position - 8) / 89) * 100}%` }}>{tick.year}</span>)}</div>
       {selected && <div className="pointer-events-none absolute z-10 min-w-[132px] -translate-x-1/2 -translate-y-full rounded-lg border border-sky-200/20 bg-[#08243d]/80 px-2.5 py-2 opacity-90 shadow-xl" style={{ left: selected.x, top: Math.max(76, selected.y - 8) }}><p className="text-[10px] text-slate-400">{formatDate(selected.point.date)}</p><p className="font-semibold text-white">{formatPrice(selected.point.average, security)}</p><p className="text-[10px] text-slate-400">High {formatPrice(selected.point.high, security)} · Low {formatPrice(selected.point.low, security)}</p></div>}
