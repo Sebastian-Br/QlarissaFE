@@ -3,6 +3,7 @@ import './App.css'
 import UserLogin from './components/UserLogin'
 import UserRegistration from './components/UserRegistration'
 import Dashboard from './components/Dashboard'
+import SecurityDetail from './components/SecurityDetail'
 
 function App() {
 
@@ -13,6 +14,7 @@ function App() {
         <Route path="/login" element={<UserLogin/>} />
         <Route path="/register" element={<UserRegistration/>} />
         <Route path="/dashboard" element={<Dashboard/>} />
+        <Route path="/security/:id" element={<SecurityDetail/>} />
       </Routes>
     </BrowserRouter>
   )

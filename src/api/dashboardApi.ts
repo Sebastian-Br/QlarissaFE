@@ -1,6 +1,7 @@
 const BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export interface SearchResult {
+  id?: number | null;
   name: string;
   symbol: string;
   securityType: number;
@@ -25,6 +26,7 @@ async function search(endpoint: string, userQuery: string, signal: AbortSignal):
 
   const results: Array<Partial<SearchResult>> = await response.json();
   return results.map((result) => ({
+    id: result.id ?? null,
     name: result.name ?? "",
     symbol: result.symbol ?? "",
     securityType: result.securityType ?? 1,

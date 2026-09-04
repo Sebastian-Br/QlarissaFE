@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Lock, Search, TrendingUp, Unlock } from "lucide-react";
+import { Link } from "react-router-dom";
 import { addSecurity, searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
 
 interface Mover {
@@ -74,7 +75,9 @@ function SecurityDetails({ result }: { result: SearchResult }) {
 }
 
 function SecurityResult({ result }: { result: SearchResult }) {
-  return <button className="w-full rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-800/80"><SecurityDetails result={result} /></button>;
+  if (!result.id) return <div className="w-full rounded-xl px-3 py-3 text-left"><SecurityDetails result={result} /></div>;
+
+  return <Link to={`/security/${result.id}`} aria-label={`View ${result.name} details`} className="group flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-800/80 focus-visible:bg-slate-800/80"><div className="min-w-0 flex-1"><SecurityDetails result={result} /></div><span className="flex shrink-0 items-center gap-1 rounded-lg border border-sky-300/20 bg-sky-400/10 px-2 py-1 text-xs font-semibold text-sky-300 transition-colors group-hover:bg-sky-400/20">View <ArrowRight size={14} /></span></Link>;
 }
 
 function UnknownSecurityResult({ result, isAdding, onAdd }: { result: SearchResult; isAdding: boolean; onAdd: (result: SearchResult) => void }) {
