@@ -112,13 +112,6 @@ function Chart({
   const chartRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; pan: number } | null>(null);
 
-  useEffect(() => {
-    setStartDate(history[0]?.date ?? "");
-    setEndDate(history.at(-1)?.date ?? "");
-    setZoom(1);
-    setPan(0);
-  }, [history]);
-
   const filteredHistory = useMemo(
     () =>
       history.filter(
