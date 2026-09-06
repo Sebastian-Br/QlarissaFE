@@ -917,7 +917,10 @@ export default function SecurityDetail() {
       });
     };
 
-    const handleSnapshot = (update: LivePrice) => applyLivePrice(update);
+    const handleSnapshot = (updates: LivePrice[]) => {
+      const update = updates[0];
+      if (update) applyLivePrice(update);
+    };
     const handleBatch = (updates: LivePrice[]) => {
       const update = updates.find(
         (item) => item.symbol.toUpperCase() === normalizedSymbol,
