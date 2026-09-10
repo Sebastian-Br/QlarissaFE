@@ -14,7 +14,7 @@ import {
   Settings,
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
-import { getSecurity } from "@/api/securityApi";
+import { getSecurity, updateSecurity } from "@/api/securityApi";
 import {
   SecurityType,
   type DailyPrice,
@@ -811,6 +811,8 @@ export default function SecurityDetail() {
   const [liveTimestamp, setLiveTimestamp] = useState<string | null>(null);
   const [liveUpdatesUnavailable, setLiveUpdatesUnavailable] = useState(false);
   const [error, setError] = useState(false);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -835,6 +837,22 @@ export default function SecurityDetail() {
       });
     return () => controller.abort();
   }, [securityId]);
+
+  const handleUpdate = async () => {
+    if (isUpdating) return;
+
+    setIsUpdating(true);
+    setUpdateError(null);
+    try {
+      await updateSecurity(securityId);
+      window.location.reload();
+    } catch (cause) {
+      setUpdateError(
+        cause instanceof Error ? cause.message : "Unable to update security.",
+      );
+      setIsUpdating(false);
+    }
+  };
 
   useEffect(() => {
     if (!security) return;
@@ -959,8 +977,14 @@ export default function SecurityDetail() {
   }, [security]);
 
   return (
-    <main className="min-h-screen bg-[#02182c] text-slate-100">
-      <div className="mx-auto w-full max-w-[1500px] px-5 py-6 sm:px-8 lg:px-12">
+    <main
+      className="min-h-screen bg-[#02182c] text-slate-100"
+      aria-busy={isUpdating}
+    >
+      <div
+        className="mx-auto w-full max-w-[1500px] px-5 py-6 sm:px-8 lg:px-12"
+        inert={isUpdating || undefined}
+      >
         <header className="flex items-center justify-between border-b border-sky-100/10 pb-6">
           <Link
             to="/dashboard"
@@ -1003,6 +1027,15 @@ export default function SecurityDetail() {
         )}
         {security && (
           <div className="py-8">
+            {updateError && (
+              <div
+                role="alert"
+                className="mb-6 flex items-start gap-3 rounded-xl border border-rose-300/30 bg-rose-400/10 px-4 py-3 text-sm text-rose-100"
+              >
+                <Info className="mt-0.5 shrink-0 text-rose-300" size={18} />
+                <p>{updateError}</p>
+              </div>
+            )}
             <section className="flex flex-col justify-between gap-6 rounded-t-2xl rounded-b-none border border-b-0 border-sky-200/15 bg-gradient-to-br from-slate-900/80 to-[#08243d] p-6 shadow-xl shadow-slate-950/20 sm:p-8 lg:flex-row lg:items-end">
               <div>
                 <div className="flex flex-wrap items-center gap-3">
@@ -1032,6 +1065,15 @@ export default function SecurityDetail() {
                 <p className="mt-2 text-xs text-slate-500">
                   Updated {formatDateTime(liveTimestamp ?? security.priceLastUpdatedTime)}
                 </p>
+                <button
+                  type="button"
+                  onClick={handleUpdate}
+                  disabled={isUpdating}
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-sky-300/35 bg-sky-400/10 px-4 py-2 text-sm font-semibold text-sky-100 transition-colors hover:bg-sky-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <RefreshCw size={16} />
+                  Update
+                </button>
               </div>
             </section>
             <div>
@@ -1045,6 +1087,21 @@ export default function SecurityDetail() {
           </div>
         )}
       </div>
+      {isUpdating && (
+        <div
+          className="fixed inset-0 z-50 grid place-items-center bg-[#02182c]/85 px-5 backdrop-blur-sm"
+          role="status"
+          aria-live="assertive"
+        >
+          <div className="text-center">
+            <RefreshCw className="mx-auto animate-spin text-sky-300" size={32} />
+            <p className="mt-4 font-medium text-white">Updating security…</p>
+            <p className="mt-2 text-sm text-slate-300">
+              This may take a moment. Please wait.
+            </p>
+          </div>
+        </div>
+      )}
     </main>
   );
 }

@@ -16,3 +16,21 @@ export async function getSecurity(id: number, signal?: AbortSignal): Promise<Sec
 
   return response.json();
 }
+
+export async function updateSecurity(id: number): Promise<void> {
+  const token = localStorage.getItem("jwt");
+  const response = await fetch(
+    `${BASE_URL}/api/Security/Update?id=${encodeURIComponent(id)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (response.status === 200) return;
+
+  const message = (await response.text()).trim();
+  throw new Error(message || "Unable to update security.");
+}
