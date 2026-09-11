@@ -85,9 +85,11 @@ function dateOnlyFromTimestamp(timestamp: string) {
 function Chart({
   security,
   priceHistory,
+  livePriceDate,
 }: {
   security: PubliclyTradedSecurityBase;
   priceHistory: DailyPrice[];
+  livePriceDate: string | null;
 }) {
   const history = useMemo(
     () => [...priceHistory].sort((a, b) => a.date.localeCompare(b.date)),
@@ -111,6 +113,13 @@ function Chart({
   } | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; pan: number } | null>(null);
+
+  useEffect(() => {
+    if (livePriceDate && livePriceDate > endDate) {
+      setEndDate(livePriceDate);
+      setPan(0);
+    }
+  }, [endDate, livePriceDate]);
 
   const filteredHistory = useMemo(
     () =>
@@ -907,6 +916,12 @@ export default function SecurityDetail() {
           );
         }
 
+        const latestDate = history.reduce(
+          (latest, point) => (point.date > latest ? point.date : latest),
+          "",
+        );
+        if (date <= latestDate) return history;
+
         return [
           ...history,
           {
@@ -1077,7 +1092,13 @@ export default function SecurityDetail() {
               </div>
             </section>
             <div>
-              <Chart security={security} priceHistory={graphHistory} />
+              <Chart
+                security={security}
+                priceHistory={graphHistory}
+                livePriceDate={
+                  liveTimestamp ? dateOnlyFromTimestamp(liveTimestamp) : null
+                }
+              />
             </div>
             <div className="mt-6">
               <div className="grid content-start gap-6">
