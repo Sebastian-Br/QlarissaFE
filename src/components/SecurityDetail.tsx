@@ -114,6 +114,13 @@ function Chart({
   const chartRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; pan: number } | null>(null);
 
+  useEffect(() => {
+    if (livePriceDate && livePriceDate > endDate) {
+      setEndDate(livePriceDate);
+      setPan(0);
+    }
+  }, [endDate, livePriceDate]);
+
   const filteredHistory = useMemo(
     () =>
       history.filter(
