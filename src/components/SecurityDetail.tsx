@@ -494,21 +494,6 @@ function Chart({
               strokeWidth="0.75"
               vectorEffect="non-scaling-stroke"
             />
-            {livePriceDate &&
-              visibleHistory.map(
-                (point, index) =>
-                  point.date === livePriceDate && (
-                    <circle
-                      key={`live-${point.id}`}
-                      cx={x(index)}
-                      cy={y(point.average)}
-                      r="1.15"
-                      fill="#7dd3fc"
-                      style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }}
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  ),
-              )}
             {yearTicks.map((tick) => (
               <line
                 key={`tick-${tick.year}`}
