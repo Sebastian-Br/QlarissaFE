@@ -85,9 +85,11 @@ function dateOnlyFromTimestamp(timestamp: string) {
 function Chart({
   security,
   priceHistory,
+  livePriceDate,
 }: {
   security: PubliclyTradedSecurityBase;
   priceHistory: DailyPrice[];
+  livePriceDate: string | null;
 }) {
   const history = useMemo(
     () => [...priceHistory].sort((a, b) => a.date.localeCompare(b.date)),
@@ -485,6 +487,21 @@ function Chart({
               strokeWidth="0.75"
               vectorEffect="non-scaling-stroke"
             />
+            {livePriceDate &&
+              visibleHistory.map(
+                (point, index) =>
+                  point.date === livePriceDate && (
+                    <circle
+                      key={`live-${point.id}`}
+                      cx={x(index)}
+                      cy={y(point.average)}
+                      r="1.15"
+                      fill="#7dd3fc"
+                      style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }}
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ),
+              )}
             {yearTicks.map((tick) => (
               <line
                 key={`tick-${tick.year}`}
@@ -907,6 +924,12 @@ export default function SecurityDetail() {
           );
         }
 
+        const latestDate = history.reduce(
+          (latest, point) => (point.date > latest ? point.date : latest),
+          "",
+        );
+        if (date <= latestDate) return history;
+
         return [
           ...history,
           {
@@ -1077,7 +1100,13 @@ export default function SecurityDetail() {
               </div>
             </section>
             <div>
-              <Chart security={security} priceHistory={graphHistory} />
+              <Chart
+                security={security}
+                priceHistory={graphHistory}
+                livePriceDate={
+                  liveTimestamp ? dateOnlyFromTimestamp(liveTimestamp) : null
+                }
+              />
             </div>
             <div className="mt-6">
               <div className="grid content-start gap-6">
