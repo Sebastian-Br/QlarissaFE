@@ -173,20 +173,31 @@ export default function UserRegistration() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center rounded-xl p-4">
-      <Card className="relative w-full max-w-md shadow-xl">
+    <main className="flex min-h-screen items-center justify-center bg-[#02182c] px-5 py-10 text-slate-100 sm:px-8">
+      <Card className="relative w-full max-w-md border-sky-200/15 bg-gradient-to-br from-slate-900/90 to-[#08243d] py-8 shadow-2xl shadow-slate-950/40 backdrop-blur-sm">
         <Button
           variant="link"
-          className="absolute top-2 right-2 h-auto p-0 text-blue-300 hover:text-blue-400 hover:no-underline"
+          className="absolute right-6 top-6 h-auto p-0 text-sm font-medium text-sky-300 hover:text-sky-200 hover:no-underline"
           onClick={() => navigate("/login")}
         >
-          <span className="text-sm">Already have an account?</span>
+          Sign in
         </Button>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-7 px-6 sm:px-8">
+          <div className="space-y-3 pr-24">
+            <p className="text-sm font-bold tracking-tight text-white">Qlarissa<span className="text-sky-400">.</span></p>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-tight text-white">Create your account</h1>
+              <p className="mt-1 text-sm text-slate-400">Set up your workspace and start tracking your securities.</p>
+            </div>
+          </div>
+          <div className="h-1 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label="Registration progress" aria-valuemin={0} aria-valuemax={4} aria-valuenow={validFieldCount}>
+            <div className="h-full rounded-full bg-sky-400 transition-[width] duration-300" style={{ width: `${progress}%` }} />
+          </div>
+          <div className="space-y-5">
           <div className="space-y-2">
             <Label htmlFor="username">Username</Label>
             <div className="relative">
-              <Input id="username" value={username} onChange={event => updateUsername(event.target.value)} placeholder="your username" className="pr-10" />
+              <Input id="username" value={username} onChange={event => updateUsername(event.target.value)} placeholder="your username" className="h-11 border-sky-200/15 !bg-[#061d32]/70 text-slate-100 placeholder:text-slate-500 focus-visible:border-sky-400 pr-10" />
               <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
                 <StatusIndicator status={usernameStatus} />
               </span>
@@ -197,7 +208,7 @@ export default function UserRegistration() {
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <div className="relative">
-              <Input type="email" id="email" value={email} onChange={event => updateEmail(event.target.value)} placeholder="your email address" className="pr-10" />
+              <Input type="email" id="email" value={email} onChange={event => updateEmail(event.target.value)} placeholder="your email address" className="h-11 border-sky-200/15 !bg-[#061d32]/70 text-slate-100 placeholder:text-slate-500 focus-visible:border-sky-400 pr-10" />
               <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
                 <StatusIndicator status={emailStatus} />
               </span>
@@ -214,7 +225,7 @@ export default function UserRegistration() {
                     id="display-currency"
                     value={displayCurrencyId ?? ""}
                     onChange={event => setDisplayCurrencyId(Number(event.target.value))}
-                    className={`border-input bg-transparent [&>option]:bg-background [&>option]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 flex h-9 w-full rounded-md border px-3 py-1 text-sm shadow-xs outline-none focus-visible:ring-[3px] disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 ${displayCurrencyId === null ? "text-muted-foreground opacity-70" : "text-foreground"}`}
+                    className={`flex h-11 w-full rounded-lg border border-sky-200/15 !bg-[#061d32]/70 px-3 py-1 text-sm text-slate-100 shadow-sm outline-none transition-colors [&>option]:bg-[#08243d] [&>option]:text-slate-100 focus-visible:border-sky-400 focus-visible:ring-2 focus-visible:ring-sky-400/30 disabled:cursor-not-allowed disabled:opacity-50 ${displayCurrencyId === null ? "text-slate-500" : "text-slate-100"}`}
                     disabled={currencies.length === 0}
                   >
                     <option value="" disabled>select a currency</option>
@@ -235,7 +246,7 @@ export default function UserRegistration() {
             <Tooltip>
               <TooltipTrigger asChild>
                 <div className="relative">
-                  <Input type="password" id="password" value={password} onChange={event => updatePassword(event.target.value)} placeholder="your password" className="pr-10" />
+                  <Input type="password" id="password" value={password} onChange={event => updatePassword(event.target.value)} placeholder="your password" className="h-11 border-sky-200/15 !bg-[#061d32]/70 text-slate-100 placeholder:text-slate-500 focus-visible:border-sky-400 pr-10" />
                   <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
                     <StatusIndicator status={passwordStatus} />
                   </span>
@@ -254,12 +265,12 @@ export default function UserRegistration() {
             <TooltipTrigger asChild>
               <span className={`block w-full ${canRegister ? "" : "cursor-not-allowed"}`}>
                 <Button
-                  className="relative w-full overflow-hidden disabled:cursor-not-allowed disabled:bg-slate-500 disabled:hover:bg-slate-500 disabled:opacity-100"
+                  className="relative h-11 w-full overflow-hidden bg-sky-400 font-semibold text-slate-950 hover:bg-sky-300 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500 disabled:opacity-100"
                   onClick={handleRegister}
                   disabled={!canRegister}
                 >
                   <span
-                    className="absolute inset-y-0 left-0 bg-blue-600 transition-[width] duration-300"
+                    className="absolute inset-y-0 left-0 bg-sky-300/60 transition-[width] duration-300"
                     style={{ width: `${progress}%` }}
                     aria-hidden="true"
                   />
@@ -273,8 +284,9 @@ export default function UserRegistration() {
               </TooltipContent>
             )}
           </Tooltip>
+          </div>
         </CardContent>
       </Card>
-    </div>
+    </main>
   )
 }
