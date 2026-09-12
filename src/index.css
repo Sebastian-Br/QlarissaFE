@@ -88,26 +88,44 @@ try out: Inter, Baskervville,
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground antialiased;
     font-family: 'Varela Round', sans-serif;
   }
-  label,
-input,
-textarea,
-select,
-button,
-/*h1, h2, h3, h4, h5, h6,*/
-p, span, div {
-    font-size: 1.125rem !important;
+
+  button,
+  a,
+  input,
+  select,
+  textarea {
+    @apply transition-[color,background-color,border-color,box-shadow,opacity,transform] duration-150 ease-out;
+  }
+
+  button:not(:disabled),
+  a {
+    @apply active:scale-[0.98];
+  }
+
+  :focus-visible {
+    @apply outline-2 outline-offset-2 outline-sky-400;
   }
 }
 
-/* Softer gray for input placeholders */
-input::placeholder, textarea::placeholder {
-  color: #c1cbd6;
-  opacity: 0.7; /* Ensures color is not faded */
-  font-size: 1rem;
+input::placeholder,
+textarea::placeholder {
+  @apply text-slate-500 opacity-100;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 @keyframes movement-arrow-up {

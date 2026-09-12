@@ -359,7 +359,7 @@ function Chart({
       {visibleHistory.length > 1 ? (
         <div
           ref={chartRef}
-          className="relative mt-0 h-[540px] cursor-default touch-none select-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3"
+          className="relative mt-0 h-[clamp(20rem,55vw,33.75rem)] cursor-default touch-none select-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3"
           onPointerLeave={() => setHovered(null)}
           onPointerMove={handlePointerMove}
           onPointerDown={(event) => {
@@ -396,7 +396,7 @@ function Chart({
               event.stopPropagation();
               setShowSettings((current) => !current);
             }}
-            className="pointer-events-auto absolute right-4 top-4 z-50 grid h-9 w-9 place-items-center rounded-lg border border-sky-200/15 bg-[#08243d]/80 text-slate-400 hover:bg-slate-800 hover:text-slate-200"
+            className="pointer-events-auto absolute right-4 top-4 z-50 grid h-9 w-9 place-items-center rounded-lg border border-sky-200/15 bg-[#08243d]/80 text-slate-400 shadow-sm transition-colors hover:bg-slate-800 hover:text-slate-200 focus-visible:border-sky-400"
           >
             <Settings size={17} />
           </button>
@@ -581,7 +581,7 @@ function Chart({
           )}
         </div>
       ) : (
-        <div className="mt-8 grid h-[470px] place-items-center rounded-xl border border-dashed border-sky-200/15 bg-[#061d32] text-center">
+        <div className="mt-8 grid min-h-[20rem] place-items-center rounded-xl border border-dashed border-sky-200/15 bg-[#061d32] p-6 text-center sm:min-h-[29.375rem]">
           <div>
             <Info className="mx-auto text-sky-300" size={22} />
             <p className="mt-3 font-medium text-slate-200">
@@ -1084,7 +1084,7 @@ export default function SecurityDetail() {
                   type="button"
                   onClick={handleUpdate}
                   disabled={isUpdating}
-                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-sky-300/35 bg-sky-400/10 px-4 py-2 text-sm font-semibold text-sky-100 transition-colors hover:bg-sky-400/20 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-5 inline-flex items-center gap-2 rounded-xl border border-sky-300/35 bg-sky-400/10 px-4 py-2 text-sm font-semibold text-sky-100 shadow-sm transition-colors hover:bg-sky-400/20 hover:shadow-[0_0_14px_rgba(56,189,248,0.25)] focus-visible:border-sky-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <RefreshCw size={16} />
                   Update
