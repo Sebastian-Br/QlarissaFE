@@ -41,6 +41,10 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
   timeStyle: "medium",
   timeZone: "UTC",
 });
+const monthFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  timeZone: "UTC",
+});
 const numberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
 });
@@ -113,6 +117,17 @@ function Chart({
   } | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<{ x: number; pan: number } | null>(null);
+  const [chartWidth, setChartWidth] = useState(0);
+
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const observer = new ResizeObserver(([entry]) =>
+      setChartWidth(entry.contentRect.width),
+    );
+    observer.observe(chart);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     if (livePriceDate && livePriceDate > endDate) {
@@ -219,6 +234,60 @@ function Chart({
       return { year, date, position: xForDate(date) };
     },
   ).filter((tick) => tick.position >= 6 && tick.position <= 97);
+  const monthTicks: { date: string; month: number; position: number }[] = [];
+  const monthCursor = new Date(
+    Date.UTC(new Date(calendarStart).getUTCFullYear(), new Date(calendarStart).getUTCMonth(), 1),
+  );
+  while (monthCursor.getTime() <= calendarEnd) {
+    const month = monthCursor.getUTCMonth();
+    const date = monthCursor.toISOString().slice(0, 10);
+    const position = xForDate(date);
+    if (month > 0 && position >= 6 && position <= 97)
+      monthTicks.push({ date, month, position });
+    monthCursor.setUTCMonth(month + 1);
+  }
+  const axisWidth = chartWidth * 0.91;
+  const minMonthSpacing = monthTicks.slice(1).reduce(
+    (spacing, tick, index) =>
+      Math.min(
+        spacing,
+        (Math.abs(tick.position - monthTicks[index].position) / 91) * axisWidth,
+      ),
+    Number.POSITIVE_INFINITY,
+  );
+  const tickCandidates =
+    minMonthSpacing >= 38
+      ? monthTicks.map((tick) => ({
+          ...tick,
+          label: monthFormatter.format(new Date(`${tick.date}T00:00:00Z`)),
+          width: 26,
+        }))
+      : monthTicks
+          .filter((tick) => tick.month % 3 === 0)
+          .map((tick) => ({
+            ...tick,
+            label: `Q${Math.floor(tick.month / 3) + 1}`,
+            width: 20,
+          }));
+  const tickLabels: typeof tickCandidates = [];
+  const labelIntervals = yearTicks.map((tick) => ({
+    center: ((tick.position - 6) / 91) * axisWidth,
+    width: 30,
+  }));
+  for (const tick of tickCandidates) {
+    const center = ((tick.position - 6) / 91) * axisWidth;
+    if (
+      center < tick.width / 2 ||
+      center > axisWidth - tick.width / 2 ||
+      labelIntervals.some(
+        (label) =>
+          Math.abs(center - label.center) < (tick.width + label.width) / 2 + 4,
+      )
+    )
+      continue;
+    tickLabels.push(tick);
+    labelIntervals.push({ center, width: tick.width });
+  }
   const getHover = (event: React.PointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     const chartX = Math.max(
@@ -496,7 +565,7 @@ function Chart({
             />
             {yearTicks.map((tick) => (
               <line
-                key={`tick-${tick.year}`}
+                key={`year-${tick.year}`}
                 x1={tick.position}
                 x2={tick.position}
                 y1="86"
@@ -504,6 +573,19 @@ function Chart({
                 stroke="#7dd3fc"
                 strokeOpacity="0.5"
                 strokeWidth="0.4"
+                vectorEffect="non-scaling-stroke"
+              />
+            ))}
+            {tickLabels.map((tick) => (
+              <line
+                key={`period-${tick.date}`}
+                x1={tick.position}
+                x2={tick.position}
+                y1="86"
+                y2="88"
+                stroke="#7dd3fc"
+                strokeOpacity="0.35"
+                strokeWidth="0.35"
                 vectorEffect="non-scaling-stroke"
               />
             ))}
@@ -559,6 +641,15 @@ function Chart({
                 style={{ left: `${((tick.position - 6) / 91) * 100}%` }}
               >
                 {tick.year}
+              </span>
+            ))}
+            {tickLabels.map((tick) => (
+              <span
+                key={tick.date}
+                className="absolute -translate-x-1/2 whitespace-nowrap text-center"
+                style={{ left: `${((tick.position - 6) / 91) * 100}%` }}
+              >
+                {tick.label}
               </span>
             ))}
           </div>
