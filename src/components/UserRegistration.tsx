@@ -187,7 +187,6 @@ export default function UserRegistration() {
             <p className="text-sm font-bold tracking-tight text-white">Qlarissa<span className="text-sky-400">.</span></p>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-white">Create your account</h1>
-              <p className="mt-1 text-sm text-slate-400">Set up your workspace and start tracking your securities.</p>
             </div>
           </div>
           <div className="h-1 overflow-hidden rounded-full bg-slate-800" role="progressbar" aria-label="Registration progress" aria-valuemin={0} aria-valuemax={4} aria-valuenow={validFieldCount}>
