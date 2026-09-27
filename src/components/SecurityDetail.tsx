@@ -622,12 +622,12 @@ function Chart({
                 />
               )}
           </svg>
-          <div className="pointer-events-none absolute bottom-[10%] left-0 top-[10%] w-[6%] text-right text-slate-400">
+          <div className="pointer-events-none absolute inset-y-3 left-3 w-[6%] text-right text-slate-400">
             {yTicks.map(({ label, ratio, position }) => (
               <span
                 key={ratio}
                 className="absolute right-0 -translate-y-1/2 text-xs font-medium"
-                style={{ top: `${((position - 10) / 76) * 100}%` }}
+                style={{ top: `${position}%` }}
               >
                 {label}
               </span>
