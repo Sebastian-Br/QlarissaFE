@@ -622,12 +622,12 @@ function Chart({
                 />
               )}
           </svg>
-          <div className="pointer-events-none absolute bottom-[10%] left-0 top-[10%] w-[6%] text-right text-[10px] text-slate-500">
+          <div className="pointer-events-none absolute inset-y-3 left-3 w-[6%] text-right text-slate-400">
             {yTicks.map(({ label, ratio, position }) => (
               <span
                 key={ratio}
-                className="absolute right-0 -translate-y-1/2"
-                style={{ top: `${((position - 10) / 76) * 100}%` }}
+                className="absolute right-0 -translate-y-1/2 text-xs font-medium"
+                style={{ top: `${position}%` }}
               >
                 {label}
               </span>
@@ -637,7 +637,7 @@ function Chart({
             {yearTicks.map((tick) => (
               <span
                 key={tick.year}
-                className="absolute -translate-x-1/2 text-center"
+                className="absolute -translate-x-1/2 text-center text-xs font-medium text-slate-400"
                 style={{ left: `${((tick.position - 6) / 91) * 100}%` }}
               >
                 {tick.year}
