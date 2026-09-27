@@ -41,7 +41,7 @@ export default function UserRegistration() {
             <p className="text-sm font-bold tracking-tight text-white">Qlarissa<span className="text-sky-400">.</span></p>
             <div>
               <h1 className="text-2xl font-semibold tracking-tight text-white">Welcome back</h1>
-              <p className="mt-1 text-sm text-slate-400">Sign in to continue to your financial workspace.</p>
+              <p className="mt-1 text-sm text-slate-400">Sign in to continue to your financial research workspace.</p>
             </div>
           </div>
           <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); void handleLogin(); }}>
