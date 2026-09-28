@@ -247,7 +247,6 @@ function Chart({
     monthCursor.setUTCMonth(month + 1);
   }
   const axisWidth = chartWidth * 0.91;
-  const quarterTicks = monthTicks.filter((tick) => tick.month % 3 === 0);
   const minMonthSpacing = monthTicks.slice(1).reduce(
     (spacing, tick, index) =>
       Math.min(
@@ -289,13 +288,9 @@ function Chart({
     tickLabels.push(tick);
     labelIntervals.push({ center, width: tick.width });
   }
-  const allQuarterLabelsVisible =
-    quarterTicks.length > 0 &&
-    quarterTicks.every((quarter) =>
-      tickLabels.some(
-        (tick) => tick.date === quarter.date && tick.label.startsWith("Q"),
-      ),
-    );
+  const allQuarterLabelsVisible = ["Q2", "Q3", "Q4"].every((label) =>
+    tickLabels.some((tick) => tick.label === label),
+  );
   const showTimeHoverCard = minMonthSpacing >= 38 || allQuarterLabelsVisible;
   const getHover = (event: React.PointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
