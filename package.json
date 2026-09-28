@@ -42,5 +42,10 @@
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.35.1",
     "vite": "^7.0.4"
+  },
+  "allowScripts": {
+    "@swc/core@1.13.2": true,
+    "@tailwindcss/oxide@4.1.11": true,
+    "esbuild@0.25.8": true
   }
 }
