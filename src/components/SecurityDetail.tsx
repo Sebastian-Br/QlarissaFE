@@ -653,12 +653,12 @@ function Chart({
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-200"
+                  className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-300/35"
                   style={{ left: hovered.x, top: hovered.axisY }}
                 />
                 <div
                   aria-hidden="true"
-                  className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-200"
+                  className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-300/35"
                   style={{ left: hovered.axisX, top: hovered.y }}
                 />
               </>
