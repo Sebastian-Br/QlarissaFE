@@ -306,7 +306,11 @@ function Chart({
     const pointY = y(point.average);
     const distance = Math.hypot((chartX - pointX) / 89, (chartY - pointY) / 76);
     return distance <= 0.06
-      ? { point, x: event.clientX - box.left, y: event.clientY - box.top }
+      ? {
+          point,
+          x: 12 + ((box.width - 24) * pointX) / 100,
+          y: 12 + ((box.height - 24) * pointY) / 100,
+        }
       : null;
   };
   const updateHover = (event: React.PointerEvent<HTMLDivElement>) =>
@@ -354,6 +358,9 @@ function Chart({
     chart.addEventListener("wheel", handleWheel, { passive: false });
     return () => chart.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
+  const hoveredDate = hovered
+    ? new Date(`${hovered.point.date}T00:00:00Z`)
+    : null;
 
   return (
     <section className="p-0">
@@ -620,7 +627,26 @@ function Chart({
                 />
               )}
           </svg>
-          <div className="pointer-events-none absolute inset-y-3 left-3 w-[6%] text-right text-slate-400">
+          {hovered && hoveredDate && (
+            <>
+              <div
+                className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/95 px-2 py-1 text-xs font-semibold text-white shadow-lg"
+                style={{
+                  left: Math.min(chartWidth - 48, Math.max(54, hovered.x)),
+                  top: "88%",
+                }}
+              >
+                {monthFormatter.format(hoveredDate)} {hoveredDate.getUTCDate()}
+              </div>
+              <div
+                className="pointer-events-none absolute left-[7%] z-20 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/95 px-2 py-1 text-xs font-semibold text-white shadow-lg"
+                style={{ top: hovered.y }}
+              >
+                {formatPrice(hovered.point.average, security)}
+              </div>
+            </>
+          )}
+          <div className="pointer-events-none absolute inset-y-3 left-1 w-[5%] text-right text-slate-400">
             {yTicks.map(({ label, ratio, position }) => (
               <span
                 key={ratio}
