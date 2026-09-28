@@ -1222,16 +1222,22 @@ export default function SecurityDetail() {
                 </div>
                 {security.securityType === SecurityType.Stock &&
                   security.businessSummary && (
-                    <div className="mt-3 max-w-3xl">
+                    <div className="relative mt-3 max-w-3xl">
                       <p
                         id="business-summary"
                         ref={businessSummaryRef}
                         style={{
                           maxHeight: isBusinessSummaryExpanded
-                            ? `${businessSummaryRef.current?.scrollHeight ?? 24}px`
-                            : "24px",
+                            ? `${businessSummaryRef.current?.scrollHeight ?? 72}px`
+                            : "72px",
+                          maskImage: isBusinessSummaryExpanded
+                            ? "none"
+                            : "linear-gradient(to bottom, #000 0px, #000 24px, rgb(0 0 0 / 0.55) 48px, rgb(0 0 0 / 0.2) 72px)",
+                          WebkitMaskImage: isBusinessSummaryExpanded
+                            ? "none"
+                            : "linear-gradient(to bottom, #000 0px, #000 24px, rgb(0 0 0 / 0.55) 48px, rgb(0 0 0 / 0.2) 72px)",
                         }}
-                        className="overflow-hidden text-sm leading-6 text-slate-300 transition-[max-height] duration-300 ease-in-out motion-reduce:transition-none"
+                        className="overflow-hidden pr-16 text-sm leading-6 text-slate-300 transition-[max-height] duration-300 ease-in-out motion-reduce:transition-none"
                       >
                         {security.businessSummary}
                       </p>
@@ -1247,7 +1253,7 @@ export default function SecurityDetail() {
                         onClick={() =>
                           setIsBusinessSummaryExpanded((expanded) => !expanded)
                         }
-                        className="mt-1 inline-flex size-7 items-center justify-center rounded-full text-sky-300 transition-colors hover:bg-sky-400/10 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
+                        className="absolute right-0 top-9 inline-flex h-8 w-16 -translate-y-1/2 items-center justify-center rounded-xl border border-sky-300/20 bg-slate-900/90 text-sky-300 shadow-lg backdrop-blur-sm transition-colors hover:bg-sky-400/15 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
                       >
                         <ChevronDown
                           size={16}
