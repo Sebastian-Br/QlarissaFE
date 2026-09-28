@@ -343,10 +343,8 @@ function Chart({
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
     updateHover(event);
     if (!dragRef.current) return;
-    const box = event.currentTarget.getBoundingClientRect();
     const pointDelta = Math.round(
-      ((event.clientX - dragRef.current.x) / box.width) *
-        filteredHistory.length,
+      ((event.clientX - dragRef.current.x) / axisWidth) * (pointCount - 1),
     );
     setPan(Math.max(0, Math.min(maxPan, dragRef.current.pan + pointDelta)));
   };
