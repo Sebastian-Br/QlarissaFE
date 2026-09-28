@@ -824,23 +824,6 @@ function TypeSpecificDetails({ security }: { security: Security }) {
             }
           />
         </DetailCard>
-        {stock.businessSummary && (
-          <DetailCard title="Business summary">
-            <p className="text-sm leading-7 text-slate-300">
-              {stock.businessSummary}
-            </p>
-            {stock.investorRelationsURL && (
-              <a
-                href={stock.investorRelationsURL}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-sky-300 hover:text-sky-200"
-              >
-                Investor relations <ExternalLink size={14} />
-              </a>
-            )}
-          </DetailCard>
-        )}
         <Events
           title="Dividend payouts"
           events={stock.dividendPayouts}
@@ -975,6 +958,7 @@ export default function SecurityDetail() {
   const [error, setError] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [isBusinessSummaryExpanded, setIsBusinessSummaryExpanded] = useState(false);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -987,6 +971,7 @@ export default function SecurityDetail() {
     setGraphHistory([]);
     setLivePrice(null);
     setLiveTimestamp(null);
+    setIsBusinessSummaryExpanded(false);
     setError(false);
     getSecurity(securityId, controller.signal)
       .then((loadedSecurity) => {
@@ -1217,9 +1202,44 @@ export default function SecurityDetail() {
                 <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                   {security.name}
                 </h1>
-                <p className="mt-2 text-lg text-slate-400">
-                  {security.symbol} · {security.shortName}
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p className="text-lg text-slate-400">
+                    {security.symbol} · {security.shortName}
+                  </p>
+                  {security.securityType === SecurityType.Stock &&
+                    security.investorRelationsURL && (
+                      <a
+                        href={security.investorRelationsURL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-300 transition-colors hover:text-sky-200"
+                      >
+                        Investor relations <ExternalLink size={14} />
+                      </a>
+                    )}
+                </div>
+                {security.securityType === SecurityType.Stock &&
+                  security.businessSummary && (
+                    <div className="mt-3 max-w-3xl">
+                      <p
+                        className={`text-sm leading-6 text-slate-300 ${
+                          isBusinessSummaryExpanded ? "" : "line-clamp-1"
+                        }`}
+                      >
+                        {security.businessSummary}
+                      </p>
+                      <button
+                        type="button"
+                        aria-expanded={isBusinessSummaryExpanded}
+                        onClick={() =>
+                          setIsBusinessSummaryExpanded((expanded) => !expanded)
+                        }
+                        className="mt-1 rounded text-sm font-medium text-sky-300 transition-colors hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
+                      >
+                        {isBusinessSummaryExpanded ? "Show less" : "Show more"}
+                      </button>
+                    </div>
+                  )}
               </div>
               <div className="lg:text-right">
                 <p className="text-3xl font-semibold text-white">
