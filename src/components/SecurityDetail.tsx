@@ -677,7 +677,7 @@ function Chart({
                 </div>
               )}
               <div
-                className="pointer-events-none absolute left-[7%] z-20 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
+                className="pointer-events-none absolute right-full z-20 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
                 style={{ top: hovered.y }}
               >
                 {numberFormatter.format(hovered.point.average)}
