@@ -109,6 +109,8 @@ function Chart({
     point: DailyPrice;
     x: number;
     y: number;
+    axisX: number;
+    axisY: number;
   } | null>(null);
   const [selected, setSelected] = useState<{
     point: DailyPrice;
@@ -116,6 +118,7 @@ function Chart({
     y: number;
   } | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const pointerPositionRef = useRef<{ x: number; y: number } | null>(null);
   const dragRef = useRef<{ x: number; pan: number } | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
 
@@ -153,9 +156,9 @@ function Chart({
     : 0;
   const maxPan = Math.max(0, filteredHistory.length - pointCount);
   const windowStart = Math.max(0, filteredHistory.length - pointCount - pan);
-  const visibleHistory = filteredHistory.slice(
-    windowStart,
-    windowStart + pointCount,
+  const visibleHistory = useMemo(
+    () => filteredHistory.slice(windowStart, windowStart + pointCount),
+    [filteredHistory, pointCount, windowStart],
   );
   useEffect(() => {
     if (
@@ -163,12 +166,7 @@ function Chart({
       !visibleHistory.some((point) => point.id === selected.point.id)
     )
       setSelected(null);
-    if (
-      hovered &&
-      !visibleHistory.some((point) => point.id === hovered.point.id)
-    )
-      setHovered(null);
-  }, [hovered, selected, visibleHistory]);
+  }, [selected, visibleHistory]);
   const values = visibleHistory
     .map((item) => item.average)
     .filter((value) => Number.isFinite(value));
@@ -288,34 +286,68 @@ function Chart({
     tickLabels.push(tick);
     labelIntervals.push({ center, width: tick.width });
   }
-  const getHover = (event: React.PointerEvent<HTMLDivElement>) => {
-    const box = event.currentTarget.getBoundingClientRect();
-    const chartX = Math.max(
-      6,
-      Math.min(97, ((event.clientX - box.left) / box.width) * 100),
-    );
-    const chartY = Math.max(
-      10,
-      Math.min(86, ((event.clientY - box.top) / box.height) * 100),
-    );
-    const index = Math.round(((chartX - 6) / 91) * (visibleHistory.length - 1));
-    const point =
-      visibleHistory[Math.max(0, Math.min(visibleHistory.length - 1, index))];
-    if (!point) return null;
-    const pointX = x(index);
-    const pointY = y(point.average);
-    const distance = Math.hypot((chartX - pointX) / 89, (chartY - pointY) / 76);
-    return distance <= 0.06
-      ? { point, x: event.clientX - box.left, y: event.clientY - box.top }
-      : null;
+  const allQuarterLabelsVisible = ["Q2", "Q3", "Q4"].every((label) =>
+    tickLabels.some((tick) => tick.label === label),
+  );
+  const showTimeHoverCard = minMonthSpacing >= 38 || allQuarterLabelsVisible;
+  const getHover = useCallback(
+    (clientX: number, clientY: number) => {
+      const box = chartRef.current?.getBoundingClientRect();
+      if (!box) return null;
+      const chartX = Math.max(
+        6,
+        Math.min(97, ((clientX - box.left) / box.width) * 100),
+      );
+      const chartY = Math.max(
+        10,
+        Math.min(86, ((clientY - box.top) / box.height) * 100),
+      );
+      const index = Math.round(
+        ((chartX - 6) / 91) * (visibleHistory.length - 1),
+      );
+      const point =
+        visibleHistory[Math.max(0, Math.min(visibleHistory.length - 1, index))];
+      if (!point) return null;
+      const pointX =
+        6 +
+        ((Date.parse(`${point.date}T00:00:00Z`) - calendarStart) /
+          calendarRange) *
+          91;
+      const value = canUseLog ? Math.log10(point.average) : point.average;
+      const pointY = 10 + ((max - value) / range) * 76;
+      const distance = Math.hypot(
+        (chartX - pointX) / 89,
+        (chartY - pointY) / 76,
+      );
+      return distance <= 0.06
+        ? {
+            point,
+            x: 12 + ((box.width - 24) * pointX) / 100,
+            y: 12 + ((box.height - 24) * pointY) / 100,
+            axisX: 12 + ((box.width - 24) * 6) / 100,
+            axisY: 12 + ((box.height - 24) * 86) / 100,
+          }
+        : null;
+    },
+    [calendarRange, calendarStart, canUseLog, max, range, visibleHistory],
+  );
+  const updateHover = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointerPositionRef.current = { x: event.clientX, y: event.clientY };
+    const next = getHover(event.clientX, event.clientY);
+    setHovered(next);
+    return next;
   };
-  const updateHover = (event: React.PointerEvent<HTMLDivElement>) =>
-    setHovered(getHover(event));
+  useEffect(() => {
+    const pointerPosition = pointerPositionRef.current;
+    if (pointerPosition)
+      setHovered(getHover(pointerPosition.x, pointerPosition.y));
+  }, [getHover]);
   const handleWheel = useCallback(
     (event: WheelEvent) => {
       event.preventDefault();
       event.stopPropagation();
       if (!filteredHistory.length) return;
+      pointerPositionRef.current = { x: event.clientX, y: event.clientY };
       const factor = event.deltaY > 0 ? 0.75 : 1.33;
       const nextZoom = Math.max(1, Math.min(32, zoom * factor));
       const nextCount = Math.min(
@@ -354,6 +386,9 @@ function Chart({
     chart.addEventListener("wheel", handleWheel, { passive: false });
     return () => chart.removeEventListener("wheel", handleWheel);
   }, [handleWheel]);
+  const hoveredDate = hovered
+    ? new Date(`${hovered.point.date}T00:00:00Z`)
+    : null;
 
   return (
     <section className="p-0">
@@ -427,17 +462,20 @@ function Chart({
         <div
           ref={chartRef}
           className="relative mt-0 h-[clamp(20rem,55vw,33.75rem)] cursor-default touch-none select-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3"
-          onPointerLeave={() => setHovered(null)}
+          onPointerLeave={() => {
+            pointerPositionRef.current = null;
+            setHovered(null);
+          }}
           onPointerMove={handlePointerMove}
           onPointerDown={(event) => {
             event.preventDefault();
-            setHovered(getHover(event));
+            updateHover(event);
             dragRef.current = { x: event.clientX, pan };
             event.currentTarget.setPointerCapture(event.pointerId);
           }}
           onPointerUp={(event) => {
             event.preventDefault();
-            const next = getHover(event);
+            const next = updateHover(event);
             const wasClick =
               dragRef.current &&
               Math.abs(event.clientX - dragRef.current.x) < 5;
@@ -587,21 +625,6 @@ function Chart({
                 vectorEffect="non-scaling-stroke"
               />
             ))}
-            {hovered &&
-              visibleHistory.some((point) => point.id === hovered.point.id) && (
-                <circle
-                  cx={x(
-                    visibleHistory.findIndex(
-                      (point) => point.id === hovered.point.id,
-                    ),
-                  )}
-                  cy={y(hovered.point.average)}
-                  r="1.35"
-                  fill="#38bdf8"
-                  style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }}
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
             {selected &&
               visibleHistory.some(
                 (point) => point.id === selected.point.id,
@@ -620,7 +643,48 @@ function Chart({
                 />
               )}
           </svg>
-          <div className="pointer-events-none absolute inset-y-3 left-3 w-[6%] text-right text-slate-400">
+          {hovered &&
+            visibleHistory.some((point) => point.id === hovered.point.id) && (
+              <>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-100 bg-sky-300 shadow-[0_0_10px_3px_rgba(56,189,248,0.75)]"
+                  style={{ left: hovered.x, top: hovered.y }}
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-300/35"
+                  style={{ left: hovered.x, top: hovered.axisY }}
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-300/35"
+                  style={{ left: hovered.axisX, top: hovered.y }}
+                />
+              </>
+            )}
+          {hovered && hoveredDate && (
+            <>
+              {showTimeHoverCard && (
+                <div
+                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
+                  style={{
+                    left: Math.min(chartWidth - 48, Math.max(54, hovered.x)),
+                    top: "88%",
+                  }}
+                >
+                  {monthFormatter.format(hoveredDate)} {hoveredDate.getUTCDate()}
+                </div>
+              )}
+              <div
+                className="pointer-events-none absolute left-[7%] z-20 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
+                style={{ top: hovered.y }}
+              >
+                {numberFormatter.format(hovered.point.average)}
+              </div>
+            </>
+          )}
+          <div className="pointer-events-none absolute inset-y-3 left-1 w-[5%] text-right text-slate-400">
             {yTicks.map(({ label, ratio, position }) => (
               <span
                 key={ratio}
