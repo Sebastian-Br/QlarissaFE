@@ -247,6 +247,7 @@ function Chart({
     monthCursor.setUTCMonth(month + 1);
   }
   const axisWidth = chartWidth * 0.91;
+  const quarterTicks = monthTicks.filter((tick) => tick.month % 3 === 0);
   const minMonthSpacing = monthTicks.slice(1).reduce(
     (spacing, tick, index) =>
       Math.min(
@@ -288,6 +289,14 @@ function Chart({
     tickLabels.push(tick);
     labelIntervals.push({ center, width: tick.width });
   }
+  const allQuarterLabelsVisible =
+    quarterTicks.length > 0 &&
+    quarterTicks.every((quarter) =>
+      tickLabels.some(
+        (tick) => tick.date === quarter.date && tick.label.startsWith("Q"),
+      ),
+    );
+  const showTimeHoverCard = minMonthSpacing >= 38 || allQuarterLabelsVisible;
   const getHover = (event: React.PointerEvent<HTMLDivElement>) => {
     const box = event.currentTarget.getBoundingClientRect();
     const chartX = Math.max(
@@ -594,21 +603,6 @@ function Chart({
                 vectorEffect="non-scaling-stroke"
               />
             ))}
-            {hovered &&
-              visibleHistory.some((point) => point.id === hovered.point.id) && (
-                <circle
-                  cx={x(
-                    visibleHistory.findIndex(
-                      (point) => point.id === hovered.point.id,
-                    ),
-                  )}
-                  cy={y(hovered.point.average)}
-                  r="1.35"
-                  fill="#38bdf8"
-                  style={{ filter: "drop-shadow(0 0 5px #38bdf8)" }}
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
             {selected &&
               visibleHistory.some(
                 (point) => point.id === selected.point.id,
@@ -627,22 +621,32 @@ function Chart({
                 />
               )}
           </svg>
+          {hovered &&
+            visibleHistory.some((point) => point.id === hovered.point.id) && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none absolute z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-100 bg-sky-300 shadow-[0_0_10px_3px_rgba(56,189,248,0.75)]"
+                style={{ left: hovered.x, top: hovered.y }}
+              />
+            )}
           {hovered && hoveredDate && (
             <>
+              {showTimeHoverCard && (
+                <div
+                  className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
+                  style={{
+                    left: Math.min(chartWidth - 48, Math.max(54, hovered.x)),
+                    top: "88%",
+                  }}
+                >
+                  {monthFormatter.format(hoveredDate)} {hoveredDate.getUTCDate()}
+                </div>
+              )}
               <div
-                className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/95 px-2 py-1 text-xs font-semibold text-white shadow-lg"
-                style={{
-                  left: Math.min(chartWidth - 48, Math.max(54, hovered.x)),
-                  top: "88%",
-                }}
-              >
-                {monthFormatter.format(hoveredDate)} {hoveredDate.getUTCDate()}
-              </div>
-              <div
-                className="pointer-events-none absolute left-[7%] z-20 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/95 px-2 py-1 text-xs font-semibold text-white shadow-lg"
+                className="pointer-events-none absolute left-[7%] z-20 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
                 style={{ top: hovered.y }}
               >
-                {formatPrice(hovered.point.average, security)}
+                {numberFormatter.format(hovered.point.average)}
               </div>
             </>
           )}
