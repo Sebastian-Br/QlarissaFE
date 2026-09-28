@@ -109,6 +109,8 @@ function Chart({
     point: DailyPrice;
     x: number;
     y: number;
+    axisX: number;
+    axisY: number;
   } | null>(null);
   const [selected, setSelected] = useState<{
     point: DailyPrice;
@@ -314,6 +316,8 @@ function Chart({
           point,
           x: 12 + ((box.width - 24) * pointX) / 100,
           y: 12 + ((box.height - 24) * pointY) / 100,
+          axisX: 12 + ((box.width - 24) * 6) / 100,
+          axisY: 12 + ((box.height - 24) * 86) / 100,
         }
       : null;
   };
@@ -618,11 +622,23 @@ function Chart({
           </svg>
           {hovered &&
             visibleHistory.some((point) => point.id === hovered.point.id) && (
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-100 bg-sky-300 shadow-[0_0_10px_3px_rgba(56,189,248,0.75)]"
-                style={{ left: hovered.x, top: hovered.y }}
-              />
+              <>
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute z-10 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full border border-sky-100 bg-sky-300 shadow-[0_0_10px_3px_rgba(56,189,248,0.75)]"
+                  style={{ left: hovered.x, top: hovered.y }}
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-200 shadow-[0_0_7px_2px_rgba(56,189,248,0.8)]"
+                  style={{ left: hovered.x, top: hovered.axisY }}
+                />
+                <div
+                  aria-hidden="true"
+                  className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-200 shadow-[0_0_7px_2px_rgba(56,189,248,0.8)]"
+                  style={{ left: hovered.axisX, top: hovered.y }}
+                />
+              </>
             )}
           {hovered && hoveredDate && (
             <>
