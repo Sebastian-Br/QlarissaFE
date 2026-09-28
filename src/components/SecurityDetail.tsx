@@ -1192,7 +1192,7 @@ export default function SecurityDetail() {
               </div>
             )}
             <section className="flex flex-col justify-between gap-6 rounded-t-2xl rounded-b-none border border-b-0 border-sky-200/15 bg-gradient-to-br from-slate-900/80 to-[#08243d] p-6 shadow-xl shadow-slate-950/20 sm:p-8 lg:flex-row lg:items-start">
-              <div>
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="rounded-lg bg-sky-400/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-sky-300">
                     {typeNames[security.securityType]}
@@ -1222,7 +1222,7 @@ export default function SecurityDetail() {
                 </div>
                 {security.securityType === SecurityType.Stock &&
                   security.businessSummary && (
-                    <div className="relative mt-3 max-w-3xl">
+                    <div className="mt-3 w-full max-w-4xl">
                       <p
                         id="business-summary"
                         ref={businessSummaryRef}
@@ -1237,7 +1237,7 @@ export default function SecurityDetail() {
                             ? "none"
                             : "linear-gradient(to bottom, #000 0px, #000 24px, rgb(0 0 0 / 0.55) 48px, rgb(0 0 0 / 0.2) 72px)",
                         }}
-                        className="overflow-hidden pr-16 text-sm leading-6 text-slate-300 transition-[max-height] duration-300 ease-in-out motion-reduce:transition-none"
+                        className="overflow-hidden text-sm leading-6 text-slate-300 transition-[max-height] duration-300 ease-in-out motion-reduce:transition-none"
                       >
                         {security.businessSummary}
                       </p>
@@ -1253,7 +1253,7 @@ export default function SecurityDetail() {
                         onClick={() =>
                           setIsBusinessSummaryExpanded((expanded) => !expanded)
                         }
-                        className="absolute right-0 top-9 inline-flex h-8 w-16 -translate-y-1/2 items-center justify-center rounded-xl border border-sky-300/20 bg-slate-900/90 text-sky-300 shadow-lg backdrop-blur-sm transition-colors hover:bg-sky-400/15 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
+                        className="mt-1 flex h-7 w-full items-center justify-center rounded-lg border border-sky-300/20 bg-slate-900/70 text-sky-300 transition-colors hover:bg-sky-400/15 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
                       >
                         <ChevronDown
                           size={16}
