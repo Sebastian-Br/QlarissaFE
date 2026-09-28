@@ -7,6 +7,7 @@ import {
 } from "@microsoft/signalr";
 import {
   ArrowLeft,
+  ChevronDown,
   ExternalLink,
   Info,
   LineChart,
@@ -824,23 +825,6 @@ function TypeSpecificDetails({ security }: { security: Security }) {
             }
           />
         </DetailCard>
-        {stock.businessSummary && (
-          <DetailCard title="Business summary">
-            <p className="text-sm leading-7 text-slate-300">
-              {stock.businessSummary}
-            </p>
-            {stock.investorRelationsURL && (
-              <a
-                href={stock.investorRelationsURL}
-                target="_blank"
-                rel="noreferrer"
-                className="mt-4 inline-flex items-center gap-2 text-sm font-medium text-sky-300 hover:text-sky-200"
-              >
-                Investor relations <ExternalLink size={14} />
-              </a>
-            )}
-          </DetailCard>
-        )}
         <Events
           title="Dividend payouts"
           events={stock.dividendPayouts}
@@ -975,6 +959,8 @@ export default function SecurityDetail() {
   const [error, setError] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const [isBusinessSummaryExpanded, setIsBusinessSummaryExpanded] = useState(false);
+  const businessSummaryRef = useRef<HTMLParagraphElement>(null);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -987,6 +973,7 @@ export default function SecurityDetail() {
     setGraphHistory([]);
     setLivePrice(null);
     setLiveTimestamp(null);
+    setIsBusinessSummaryExpanded(false);
     setError(false);
     getSecurity(securityId, controller.signal)
       .then((loadedSecurity) => {
@@ -1204,8 +1191,8 @@ export default function SecurityDetail() {
                 <p>{updateError}</p>
               </div>
             )}
-            <section className="flex flex-col justify-between gap-6 rounded-t-2xl rounded-b-none border border-b-0 border-sky-200/15 bg-gradient-to-br from-slate-900/80 to-[#08243d] p-6 shadow-xl shadow-slate-950/20 sm:p-8 lg:flex-row lg:items-end">
-              <div>
+            <section className="flex flex-col justify-between gap-6 rounded-t-2xl rounded-b-none border border-b-0 border-sky-200/15 bg-gradient-to-br from-slate-900/80 to-[#08243d] p-6 shadow-xl shadow-slate-950/20 sm:p-8 lg:flex-row lg:items-start">
+              <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-3">
                   <span className="rounded-lg bg-sky-400/15 px-2.5 py-1 text-xs font-semibold uppercase tracking-wider text-sky-300">
                     {typeNames[security.securityType]}
@@ -1217,9 +1204,66 @@ export default function SecurityDetail() {
                 <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
                   {security.name}
                 </h1>
-                <p className="mt-2 text-lg text-slate-400">
-                  {security.symbol} · {security.shortName}
-                </p>
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <p className="text-lg text-slate-400">
+                    {security.symbol} · {security.shortName}
+                  </p>
+                  {security.securityType === SecurityType.Stock &&
+                    security.investorRelationsURL && (
+                      <a
+                        href={security.investorRelationsURL}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1.5 text-sm font-medium text-sky-300 transition-colors hover:text-sky-200"
+                      >
+                        Investor relations <ExternalLink size={14} />
+                      </a>
+                    )}
+                </div>
+                {security.securityType === SecurityType.Stock &&
+                  security.businessSummary && (
+                    <div className="mt-3 w-full max-w-4xl">
+                      <p
+                        id="business-summary"
+                        ref={businessSummaryRef}
+                        style={{
+                          maxHeight: isBusinessSummaryExpanded
+                            ? `${businessSummaryRef.current?.scrollHeight ?? 72}px`
+                            : "72px",
+                          maskImage: isBusinessSummaryExpanded
+                            ? "none"
+                            : "linear-gradient(to bottom, #000 0px, #000 24px, rgb(0 0 0 / 0.55) 48px, rgb(0 0 0 / 0.2) 72px)",
+                          WebkitMaskImage: isBusinessSummaryExpanded
+                            ? "none"
+                            : "linear-gradient(to bottom, #000 0px, #000 24px, rgb(0 0 0 / 0.55) 48px, rgb(0 0 0 / 0.2) 72px)",
+                        }}
+                        className="overflow-hidden text-sm leading-6 text-slate-300 transition-[max-height] duration-300 ease-in-out motion-reduce:transition-none"
+                      >
+                        {security.businessSummary}
+                      </p>
+                      <button
+                        type="button"
+                        aria-label={
+                          isBusinessSummaryExpanded
+                            ? "Collapse business summary"
+                            : "Expand business summary"
+                        }
+                        aria-controls="business-summary"
+                        aria-expanded={isBusinessSummaryExpanded}
+                        onClick={() =>
+                          setIsBusinessSummaryExpanded((expanded) => !expanded)
+                        }
+                        className="mt-1 flex h-7 w-full items-center justify-center rounded-lg border border-sky-300/20 bg-slate-900/70 text-sky-300 transition-colors hover:bg-sky-400/15 hover:text-sky-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300/70"
+                      >
+                        <ChevronDown
+                          size={16}
+                          className={`transition-transform duration-300 ease-in-out motion-reduce:transition-none ${
+                            isBusinessSummaryExpanded ? "rotate-180" : ""
+                          }`}
+                        />
+                      </button>
+                    </div>
+                  )}
               </div>
               <div className="lg:text-right">
                 <p className="text-3xl font-semibold text-white">
