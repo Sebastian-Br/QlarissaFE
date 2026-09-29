@@ -19,6 +19,7 @@ import { getSecurity, updateSecurity } from "@/api/securityApi";
 import {
   SecurityType,
   type DailyPrice,
+  type DividendPayout,
   type ETF,
   type PubliclyTradedSecurityBase,
   type Security,
@@ -44,6 +45,11 @@ const dateTimeFormatter = new Intl.DateTimeFormat(undefined, {
 });
 const monthFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
+  timeZone: "UTC",
+});
+const dividendTickFormatter = new Intl.DateTimeFormat(undefined, {
+  month: "short",
+  year: "2-digit",
   timeZone: "UTC",
 });
 const numberFormatter = new Intl.NumberFormat(undefined, {
@@ -751,6 +757,221 @@ function Chart({
   );
 }
 
+function DividendChart({
+  payouts,
+  security,
+}: {
+  payouts: DividendPayout[];
+  security: PubliclyTradedSecurityBase;
+}) {
+  const history = useMemo(
+    () =>
+      [...payouts].sort((a, b) =>
+        a.payoutDate.localeCompare(b.payoutDate),
+      ),
+    [payouts],
+  );
+  const [isExpanded, setIsExpanded] = useState(false);
+  const [startDate, setStartDate] = useState(
+    history[0]?.payoutDate.slice(0, 10) ?? "",
+  );
+  const [endDate, setEndDate] = useState(
+    history.at(-1)?.payoutDate.slice(0, 10) ?? "",
+  );
+  const [logScale, setLogScale] = useState(true);
+  const [showSettings, setShowSettings] = useState(false);
+  const filteredPayouts = history.filter((payout) => {
+    const date = payout.payoutDate.slice(0, 10);
+    return date >= startDate && date <= endDate;
+  });
+  const amounts = filteredPayouts.map((payout) => payout.payoutAmount);
+  const positiveAmounts = amounts.filter((amount) => amount > 0);
+  const useLogScale = logScale && positiveAmounts.length > 0;
+  const minimum = useLogScale
+    ? Math.log10(Math.min(...positiveAmounts))
+    : 0;
+  const maximum = useLogScale
+    ? Math.log10(Math.max(...positiveAmounts))
+    : Math.max(0, ...amounts);
+  const range = maximum - minimum || 1;
+  const chartHeight = 76;
+
+  return (
+    <section className="mt-6 overflow-hidden rounded-2xl border border-sky-200/15 bg-slate-900/60 shadow-xl shadow-slate-950/20 backdrop-blur-sm">
+      <button
+        type="button"
+        aria-expanded={isExpanded}
+        onClick={() => setIsExpanded((expanded) => !expanded)}
+        className="flex w-full items-center justify-between gap-4 p-5 text-left transition-colors hover:bg-slate-800/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky-400"
+      >
+        <span className="text-sm font-semibold uppercase tracking-wider text-sky-300">
+          Dividend payouts
+        </span>
+        <ChevronDown
+          size={18}
+          className={`shrink-0 text-slate-400 transition-transform ${isExpanded ? "rotate-180" : ""}`}
+        />
+      </button>
+      {isExpanded && (
+        <div className="border-t border-sky-200/10 p-5 pt-4">
+          <div className="relative h-[clamp(18rem,42vw,26rem)] rounded-xl border border-sky-200/10 bg-[#061d32] p-3">
+            <button
+              type="button"
+              aria-label="Toggle dividend chart settings"
+              aria-expanded={showSettings}
+              onClick={() => setShowSettings((current) => !current)}
+              className="absolute right-4 top-4 z-10 grid h-9 w-9 place-items-center rounded-lg border border-sky-200/15 bg-[#08243d]/90 text-slate-400 shadow-sm transition-colors hover:bg-slate-800 hover:text-slate-200 focus-visible:border-sky-400"
+            >
+              <Settings size={17} />
+            </button>
+            {showSettings && (
+              <div className="absolute right-4 top-14 z-20 grid w-56 gap-3 rounded-xl border border-sky-200/20 bg-[#08243d]/95 p-4 shadow-2xl">
+                <label className="grid gap-1 text-xs font-medium text-slate-400">
+                  Start
+                  <input
+                    aria-label="Dividend chart start date"
+                    type="date"
+                    value={startDate}
+                    min={history[0]?.payoutDate.slice(0, 10)}
+                    max={endDate || undefined}
+                    onChange={(event) => setStartDate(event.target.value)}
+                    className="h-9 rounded-lg border border-sky-200/15 bg-[#061d32] px-2 text-sm text-slate-100 outline-none focus:border-sky-400"
+                  />
+                </label>
+                <label className="grid gap-1 text-xs font-medium text-slate-400">
+                  End
+                  <input
+                    aria-label="Dividend chart end date"
+                    type="date"
+                    value={endDate}
+                    min={startDate || undefined}
+                    max={history.at(-1)?.payoutDate.slice(0, 10)}
+                    onChange={(event) => setEndDate(event.target.value)}
+                    className="h-9 rounded-lg border border-sky-200/15 bg-[#061d32] px-2 text-sm text-slate-100 outline-none focus:border-sky-400"
+                  />
+                </label>
+                <button
+                  type="button"
+                  aria-label="Toggle dividend chart logarithmic scale"
+                  aria-pressed={logScale}
+                  onClick={() => setLogScale((current) => !current)}
+                  className={`inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors ${logScale ? "bg-sky-400 text-slate-950" : "border border-sky-200/15 text-slate-300 hover:bg-slate-800"}`}
+                >
+                  <LineChart size={15} />
+                  {logScale ? "Log" : "Linear"}
+                </button>
+              </div>
+            )}
+            {filteredPayouts.length > 0 ? (
+              <>
+                <svg
+                  viewBox="0 0 100 100"
+                  preserveAspectRatio="none"
+                  role="img"
+                  aria-label={`${security.name} dividend payouts chart`}
+                  className="h-full w-full"
+                >
+                  {[10, 48, 86].map((position) => (
+                    <line
+                      key={position}
+                      x1="18"
+                      x2="97"
+                      y1={position}
+                      y2={position}
+                      stroke="#7dd3fc"
+                      strokeOpacity="0.12"
+                      strokeDasharray="1.5 2"
+                      vectorEffect="non-scaling-stroke"
+                    />
+                  ))}
+                  <line
+                    x1="18"
+                    x2="97"
+                    y1="86"
+                    y2="86"
+                    stroke="#7dd3fc"
+                    strokeOpacity="0.35"
+                    strokeWidth="0.4"
+                    vectorEffect="non-scaling-stroke"
+                  />
+                  {filteredPayouts.map((payout, index) => {
+                    const amount = useLogScale
+                      ? payout.payoutAmount > 0
+                        ? Math.log10(payout.payoutAmount)
+                        : minimum
+                      : payout.payoutAmount;
+                    const ratio =
+                      maximum === minimum
+                        ? amount > 0
+                          ? 1
+                          : 0
+                        : Math.max(0, (amount - minimum) / range);
+                    const slotWidth = 79 / filteredPayouts.length;
+                    const width = Math.min(5, slotWidth * 0.58);
+                    const x = 18 + slotWidth * (index + 0.5) - width / 2;
+                    const height = chartHeight * ratio;
+                    return (
+                      <rect
+                        key={payout.id}
+                        x={x}
+                        y={86 - height}
+                        width={width}
+                        height={height}
+                        rx="0.6"
+                        fill="#34d399"
+                      >
+                        <title>
+                          {formatDate(payout.payoutDate)} · {formatPrice(payout.payoutAmount, security)}
+                        </title>
+                      </rect>
+                    );
+                  })}
+                  {filteredPayouts.map((payout, index) => {
+                    const interval = Math.max(
+                      1,
+                      Math.ceil(filteredPayouts.length / 6),
+                    );
+                    if (index % interval !== 0 && index !== filteredPayouts.length - 1)
+                      return null;
+                    const slotWidth = 79 / filteredPayouts.length;
+                    return (
+                      <text
+                        key={`date-${payout.id}`}
+                        x={18 + slotWidth * (index + 0.5)}
+                        y="96"
+                        textAnchor="middle"
+                        fill="#94a3b8"
+                        fontSize="3"
+                      >
+                        {dividendTickFormatter.format(
+                          new Date(`${payout.payoutDate.slice(0, 10)}T00:00:00Z`),
+                        )}
+                      </text>
+                    );
+                  })}
+                </svg>
+                <div className="pointer-events-none absolute inset-y-3 left-1 w-[14%] flex flex-col justify-between py-[7%] text-[10px] text-slate-400">
+                  {[maximum, (minimum + maximum) / 2, minimum].map(
+                    (value, index) => (
+                      <span key={index} className="text-right">
+                        {formatPrice(useLogScale ? 10 ** value : value, security)}
+                      </span>
+                    ),
+                  )}
+                </div>
+              </>
+            ) : (
+              <div className="grid h-full place-items-center text-sm text-slate-400">
+                No dividend payouts in this date range.
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
 function DetailCard({
   title,
   children,
@@ -825,11 +1046,6 @@ function TypeSpecificDetails({ security }: { security: Security }) {
             }
           />
         </DetailCard>
-        <Events
-          title="Dividend payouts"
-          events={stock.dividendPayouts}
-          security={stock}
-        />
         <Splits splits={stock.splits} />
       </>
     );
@@ -1297,6 +1513,13 @@ export default function SecurityDetail() {
                 }
               />
             </div>
+            {security.securityType === SecurityType.Stock &&
+              security.dividendPayouts?.length > 0 && (
+                <DividendChart
+                  payouts={security.dividendPayouts}
+                  security={security}
+                />
+              )}
             <div className="mt-6">
               <div className="grid content-start gap-6">
                 <TypeSpecificDetails security={security} />
