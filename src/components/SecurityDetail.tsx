@@ -47,11 +47,6 @@ const monthFormatter = new Intl.DateTimeFormat(undefined, {
   month: "short",
   timeZone: "UTC",
 });
-const dividendTickFormatter = new Intl.DateTimeFormat(undefined, {
-  month: "short",
-  year: "2-digit",
-  timeZone: "UTC",
-});
 const numberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 2,
 });
@@ -777,14 +772,19 @@ function DividendChart({
   );
   const [logScale, setLogScale] = useState(true);
   const [showSettings, setShowSettings] = useState(false);
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState(0);
   const [chartWidth, setChartWidth] = useState(0);
   const [hovered, setHovered] = useState<{
     payout: DividendPayout;
     x: number;
     y: number;
     axisX: number;
+    axisY: number;
   } | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+  const pointerPositionRef = useRef<{ x: number; y: number } | null>(null);
+  const dragRef = useRef<{ x: number; pan: number } | null>(null);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -796,55 +796,231 @@ function DividendChart({
     return () => observer.disconnect();
   }, [isExpanded]);
 
-  const filteredPayouts = history.filter((payout) => {
-    const date = payout.payoutDate.slice(0, 10);
-    return date >= startDate && date <= endDate;
-  });
-  const amounts = filteredPayouts.map((payout) => payout.payoutAmount);
+  const filteredPayouts = useMemo(
+    () =>
+      history.filter((payout) => {
+        const date = payout.payoutDate.slice(0, 10);
+        return date >= startDate && date <= endDate;
+      }),
+    [endDate, history, startDate],
+  );
+  const pointCount = filteredPayouts.length
+    ? Math.min(
+        filteredPayouts.length,
+        Math.max(2, Math.ceil(filteredPayouts.length / zoom)),
+      )
+    : 0;
+  const maxPan = Math.max(0, filteredPayouts.length - pointCount);
+  const windowStart = Math.max(0, filteredPayouts.length - pointCount - pan);
+  const visiblePayouts = useMemo(
+    () => filteredPayouts.slice(windowStart, windowStart + pointCount),
+    [filteredPayouts, pointCount, windowStart],
+  );
+  const amounts = visiblePayouts.map((payout) => payout.payoutAmount);
   const positiveAmounts = amounts.filter((amount) => amount > 0);
   const useLogScale = logScale && positiveAmounts.length > 0;
-  const minimum = useLogScale
-    ? Math.log10(Math.min(...positiveAmounts))
-    : 0;
-  const maximum = useLogScale
-    ? Math.log10(Math.max(...positiveAmounts))
-    : Math.max(0, ...amounts);
-  const range = maximum - minimum || 1;
+  const minValue = amounts.length ? Math.min(...amounts) : 0;
+  const maxValue = amounts.length ? Math.max(...amounts) : 0;
+  const min = useLogScale ? Math.log10(Math.min(...positiveAmounts)) : 0;
+  const max = useLogScale ? Math.log10(Math.max(...positiveAmounts)) : maxValue;
+  const range = max - min || 1;
+  const calendarStart =
+    Date.parse(`${visiblePayouts[0]?.payoutDate.slice(0, 10)}T00:00:00Z`) ||
+    Date.now();
+  const calendarEnd =
+    Date.parse(
+      `${visiblePayouts.at(-1)?.payoutDate.slice(0, 10)}T00:00:00Z`,
+    ) || calendarStart + 86_400_000;
+  const calendarRange = Math.max(1, calendarEnd - calendarStart);
+  const xForDate = (date: string) =>
+    6 +
+    ((Date.parse(`${date.slice(0, 10)}T00:00:00Z`) - calendarStart) /
+      calendarRange) *
+      91;
   const yForAmount = (amount: number) => {
     const value = useLogScale
       ? amount > 0
         ? Math.log10(amount)
-        : minimum
+        : min
       : amount;
-    const ratio =
-      maximum === minimum
-        ? amount > 0
-          ? 1
-          : 0
-        : Math.max(0, (value - minimum) / range);
-    return 10 + (1 - ratio) * 76;
+    return 10 + ((max - value) / range) * 76;
   };
+  const yTicks = useLogScale
+    ? [0, 0.33, 0.66, 1].map((ratio, index) => {
+        const rawValue = 10 ** (min + (max - min) * ratio);
+        const value = index === 0 ? minValue : Math.max(0, rawValue);
+        return {
+          ratio,
+          label: numberFormatter.format(value),
+          position: Math.max(10, Math.min(86, yForAmount(value))),
+        };
+      })
+    : [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+        const value = max * ratio;
+        return {
+          ratio,
+          label: axisNumberFormatter.format(value),
+          position: yForAmount(value),
+        };
+      });
+  const firstYear = new Date(calendarStart).getUTCFullYear();
+  const lastYear = new Date(calendarEnd).getUTCFullYear();
+  const yearTicks = Array.from(
+    { length: Math.max(1, lastYear - firstYear + 1) },
+    (_, index) => {
+      const year = firstYear + index;
+      const date = `${year}-01-01`;
+      return { year, date, position: xForDate(date) };
+    },
+  ).filter((tick) => tick.position >= 6 && tick.position <= 97);
+  const monthTicks: { date: string; month: number; position: number }[] = [];
+  const monthCursor = new Date(
+    Date.UTC(
+      new Date(calendarStart).getUTCFullYear(),
+      new Date(calendarStart).getUTCMonth(),
+      1,
+    ),
+  );
+  while (monthCursor.getTime() <= calendarEnd) {
+    const month = monthCursor.getUTCMonth();
+    const date = monthCursor.toISOString().slice(0, 10);
+    const position = xForDate(date);
+    if (month > 0 && position >= 6 && position <= 97)
+      monthTicks.push({ date, month, position });
+    monthCursor.setUTCMonth(month + 1);
+  }
+  const axisWidth = chartWidth * 0.91;
+  const minMonthSpacing = monthTicks.slice(1).reduce(
+    (spacing, tick, index) =>
+      Math.min(
+        spacing,
+        (Math.abs(tick.position - monthTicks[index].position) / 91) * axisWidth,
+      ),
+    Number.POSITIVE_INFINITY,
+  );
+  const tickCandidates =
+    minMonthSpacing >= 38
+      ? monthTicks.map((tick) => ({
+          ...tick,
+          label: monthFormatter.format(new Date(`${tick.date}T00:00:00Z`)),
+          width: 26,
+        }))
+      : monthTicks
+          .filter((tick) => tick.month % 3 === 0)
+          .map((tick) => ({
+            ...tick,
+            label: `Q${Math.floor(tick.month / 3) + 1}`,
+            width: 20,
+          }));
+  const tickLabels: typeof tickCandidates = [];
+  const labelIntervals = yearTicks.map((tick) => ({
+    center: ((tick.position - 6) / 91) * axisWidth,
+    width: 30,
+  }));
+  for (const tick of tickCandidates) {
+    const center = ((tick.position - 6) / 91) * axisWidth;
+    if (
+      center < tick.width / 2 ||
+      center > axisWidth - tick.width / 2 ||
+      labelIntervals.some(
+        (label) =>
+          Math.abs(center - label.center) < (tick.width + label.width) / 2 + 4,
+      )
+    )
+      continue;
+    tickLabels.push(tick);
+    labelIntervals.push({ center, width: tick.width });
+  }
+  const allQuarterLabelsVisible = ["Q2", "Q3", "Q4"].every((label) =>
+    tickLabels.some((tick) => tick.label === label),
+  );
+  const showTimeHoverCard = minMonthSpacing >= 38 || allQuarterLabelsVisible;
+  const getHover = useCallback(
+    (clientX: number) => {
+      const box = chartRef.current?.getBoundingClientRect();
+      if (!box || !visiblePayouts.length) return null;
+      const chartX = Math.max(
+        6,
+        Math.min(97, ((clientX - box.left) / box.width) * 100),
+      );
+      const hoveredTimestamp =
+        calendarStart + ((chartX - 6) / 91) * calendarRange;
+      const payout = visiblePayouts.reduce((closest, candidate) =>
+        Math.abs(
+          Date.parse(`${candidate.payoutDate.slice(0, 10)}T00:00:00Z`) -
+            hoveredTimestamp,
+        ) <
+        Math.abs(
+          Date.parse(`${closest.payoutDate.slice(0, 10)}T00:00:00Z`) -
+            hoveredTimestamp,
+        )
+          ? candidate
+          : closest,
+      );
+      const position = xForDate(payout.payoutDate);
+      const amountY = yForAmount(payout.payoutAmount);
+      return {
+        payout,
+        x: 12 + ((box.width - 24) * position) / 100,
+        y: 12 + ((box.height - 24) * amountY) / 100,
+        axisX: 12 + ((box.width - 24) * 6) / 100,
+        axisY: 12 + ((box.height - 24) * 86) / 100,
+      };
+    },
+    [calendarRange, calendarStart, visiblePayouts, xForDate, yForAmount],
+  );
+  const updateHover = (event: React.PointerEvent<HTMLDivElement>) => {
+    pointerPositionRef.current = { x: event.clientX, y: event.clientY };
+    const next = getHover(event.clientX);
+    setHovered(next);
+    return next;
+  };
+  const handleWheel = useCallback(
+    (event: WheelEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      if (!filteredPayouts.length) return;
+      const factor = event.deltaY > 0 ? 0.75 : 1.33;
+      const nextZoom = Math.max(1, Math.min(32, zoom * factor));
+      const nextCount = Math.min(
+        filteredPayouts.length,
+        Math.max(2, Math.ceil(filteredPayouts.length / nextZoom)),
+      );
+      const box = chartRef.current?.getBoundingClientRect();
+      const pointerRatio = box
+        ? Math.max(0, Math.min(1, (event.clientX - box.left) / box.width))
+        : 0.5;
+      const currentIndex =
+        windowStart + Math.round(pointerRatio * Math.max(0, pointCount - 1));
+      const nextStart = Math.max(
+        0,
+        Math.min(
+          filteredPayouts.length - nextCount,
+          Math.round(currentIndex - pointerRatio * (nextCount - 1)),
+        ),
+      );
+      setZoom(nextZoom);
+      setPan(filteredPayouts.length - nextCount - nextStart);
+    },
+    [filteredPayouts.length, pointCount, windowStart, zoom],
+  );
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    chart.addEventListener("wheel", handleWheel, { passive: false });
+    return () => chart.removeEventListener("wheel", handleWheel);
+  }, [handleWheel]);
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
-    const box = chartRef.current?.getBoundingClientRect();
-    if (!box || !filteredPayouts.length) return;
-    const chartX = Math.max(
-      6,
-      Math.min(97, ((event.clientX - box.left) / box.width) * 100),
+    updateHover(event);
+    if (!dragRef.current) return;
+    const pointDelta = Math.round(
+      ((event.clientX - dragRef.current.x) / axisWidth) * (pointCount - 1),
     );
-    const index = Math.round(
-      ((chartX - 6) / 91) * (filteredPayouts.length - 1),
-    );
-    const payout = filteredPayouts[index];
-    const position =
-      6 + ((index + 0.5) / filteredPayouts.length) * 91;
-    const amountY = yForAmount(payout.payoutAmount);
-    setHovered({
-      payout,
-      x: 12 + ((box.width - 24) * position) / 100,
-      y: 12 + ((box.height - 24) * amountY) / 100,
-      axisX: 12 + ((box.width - 24) * 6) / 100,
-    });
+    setPan(Math.max(0, Math.min(maxPan, dragRef.current.pan + pointDelta)));
   };
+  const hoveredDate = hovered
+    ? new Date(`${hovered.payout.payoutDate.slice(0, 10)}T00:00:00Z`)
+    : null;
 
   return (
     <section className="mt-6">
@@ -864,8 +1040,23 @@ function DividendChart({
         <div
           ref={chartRef}
           className="relative h-[clamp(20rem,55vw,33.75rem)] cursor-default touch-none select-none rounded-xl border border-sky-200/10 bg-[#061d32] p-3"
-          onPointerLeave={() => setHovered(null)}
+          onPointerLeave={() => {
+            pointerPositionRef.current = null;
+            setHovered(null);
+          }}
           onPointerMove={handlePointerMove}
+          onPointerDown={(event) => {
+            event.preventDefault();
+            updateHover(event);
+            dragRef.current = { x: event.clientX, pan };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerUp={(event) => {
+            event.preventDefault();
+            updateHover(event);
+            dragRef.current = null;
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }}
         >
           <button
             type="button"
@@ -895,7 +1086,7 @@ function DividendChart({
                   max={endDate || undefined}
                   onChange={(event) => {
                     setStartDate(event.target.value);
-                    setHovered(null);
+                    setPan(0);
                   }}
                   className="h-9 rounded-lg border border-sky-200/15 bg-[#061d32] px-2 text-sm text-slate-100 outline-none focus:border-sky-400"
                 />
@@ -910,7 +1101,7 @@ function DividendChart({
                   max={history.at(-1)?.payoutDate.slice(0, 10)}
                   onChange={(event) => {
                     setEndDate(event.target.value);
-                    setHovered(null);
+                    setPan(0);
                   }}
                   className="h-9 rounded-lg border border-sky-200/15 bg-[#061d32] px-2 text-sm text-slate-100 outline-none focus:border-sky-400"
                 />
@@ -919,18 +1110,15 @@ function DividendChart({
                 type="button"
                 aria-label="Toggle dividend chart logarithmic scale"
                 aria-pressed={logScale}
-                onClick={() => {
-                  setLogScale((current) => !current);
-                  setHovered(null);
-                }}
-                className={`inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold transition-colors ${logScale ? "bg-sky-400 text-slate-950" : "border border-sky-200/15 text-slate-300 hover:bg-slate-800"}`}
+                onClick={() => setLogScale((current) => !current)}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-sky-400 px-3 text-sm font-semibold text-slate-950"
               >
                 <LineChart size={15} />
                 {logScale ? "Log" : "Linear"}
               </button>
             </div>
           )}
-          {filteredPayouts.length > 0 ? (
+          {visiblePayouts.length > 0 ? (
             <>
               <svg
                 viewBox="0 0 100 100"
@@ -939,9 +1127,9 @@ function DividendChart({
                 aria-label={`${security.name} dividend payouts chart`}
                 className="pointer-events-none h-full w-full overflow-visible"
               >
-                {[10, 48, 86].map((position) => (
+                {yTicks.map(({ ratio, position }) => (
                   <line
-                    key={position}
+                    key={ratio}
                     x1="6"
                     x2="97"
                     y1={position}
@@ -952,144 +1140,67 @@ function DividendChart({
                     vectorEffect="non-scaling-stroke"
                   />
                 ))}
-                <line
-                  x1="6"
-                  x2="97"
-                  y1="86"
-                  y2="86"
-                  stroke="#7dd3fc"
-                  strokeOpacity="0.35"
-                  strokeWidth="0.4"
-                  vectorEffect="non-scaling-stroke"
-                />
-                <line
-                  x1="6"
-                  x2="6"
-                  y1="10"
-                  y2="86"
-                  stroke="#7dd3fc"
-                  strokeOpacity="0.35"
-                  strokeWidth="0.4"
-                  vectorEffect="non-scaling-stroke"
-                />
-                {filteredPayouts.map((payout, index) => {
-                  const position =
-                    6 + ((index + 0.5) / filteredPayouts.length) * 91;
-                  const slotWidth = 91 / filteredPayouts.length;
-                  const width = Math.min(5, slotWidth * 0.58);
+                <line x1="6" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
+                <line x1="6" x2="6" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
+                {visiblePayouts.map((payout) => {
+                  const position = xForDate(payout.payoutDate);
+                  const width = Math.min(1.25, 60 / calendarRange * 91 * 86_400_000);
                   const amountY = yForAmount(payout.payoutAmount);
-                  const height = 86 - amountY;
                   return (
                     <rect
                       key={payout.id}
                       x={position - width / 2}
                       y={amountY}
                       width={width}
-                      height={height}
-                      rx="0.6"
+                      height={86 - amountY}
+                      rx="0.35"
                       fill="#34d399"
                     >
-                      <title>
-                        {formatDate(payout.payoutDate)} · {numberFormatter.format(payout.payoutAmount)}
-                      </title>
+                      <title>{formatDate(payout.payoutDate)} · {numberFormatter.format(payout.payoutAmount)}</title>
                     </rect>
                   );
                 })}
-                {hovered && (
-                  <>
-                    <line
-                      x1={
-                        6 +
-                        ((filteredPayouts.indexOf(hovered.payout) + 0.5) /
-                          filteredPayouts.length) *
-                          91
-                      }
-                      x2={
-                        6 +
-                        ((filteredPayouts.indexOf(hovered.payout) + 0.5) /
-                          filteredPayouts.length) *
-                          91
-                      }
-                      y1="10"
-                      y2="86"
-                      stroke="#7dd3fc"
-                      strokeOpacity="0.35"
-                      strokeDasharray="1.5 2"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                    <line
-                      x1="6"
-                      x2="97"
-                      y1={yForAmount(hovered.payout.payoutAmount)}
-                      y2={yForAmount(hovered.payout.payoutAmount)}
-                      stroke="#7dd3fc"
-                      strokeOpacity="0.35"
-                      strokeDasharray="1.5 2"
-                      vectorEffect="non-scaling-stroke"
-                    />
-                  </>
-                )}
+                {yearTicks.map((tick) => (
+                  <line key={`year-${tick.year}`} x1={tick.position} x2={tick.position} y1="86" y2="89" stroke="#7dd3fc" strokeOpacity="0.5" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
+                ))}
+                {tickLabels.map((tick) => (
+                  <line key={`period-${tick.date}`} x1={tick.position} x2={tick.position} y1="86" y2="88" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.35" vectorEffect="non-scaling-stroke" />
+                ))}
               </svg>
-              <div className="pointer-events-none absolute inset-y-3 left-1 w-[5%] text-right text-slate-400">
-                {[maximum, (minimum + maximum) / 2, minimum].map(
-                  (value, index) => (
-                    <span
-                      key={index}
-                      className="absolute right-0 -translate-y-1/2 text-xs font-medium"
-                      style={{ top: `${[10, 48, 86][index]}%` }}
-                    >
-                      {numberFormatter.format(useLogScale ? 10 ** value : value)}
-                    </span>
-                  ),
-                )}
-              </div>
-              <div className="pointer-events-none absolute bottom-[8%] left-[6%] right-[3%] text-[10px] text-slate-500">
-                {filteredPayouts.map((payout, index) => {
-                  const interval = Math.max(
-                    1,
-                    Math.ceil(filteredPayouts.length / 6),
-                  );
-                  if (index % interval !== 0 && index !== filteredPayouts.length - 1)
-                    return null;
-                  return (
-                    <span
-                      key={payout.id}
-                      className="absolute -translate-x-1/2 whitespace-nowrap text-center"
-                      style={{
-                        left: `${((index + 0.5) / filteredPayouts.length) * 100}%`,
-                      }}
-                    >
-                      {dividendTickFormatter.format(
-                        new Date(`${payout.payoutDate.slice(0, 10)}T00:00:00Z`),
-                      )}
-                    </span>
-                  );
-                })}
-              </div>
-              {hovered && filteredPayouts.includes(hovered.payout) && (
+              {hovered && visiblePayouts.some((payout) => payout.id === hovered.payout.id) && (
                 <>
-                  <div
-                    className="pointer-events-none absolute z-10 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
-                    style={{
-                      left: Math.min(chartWidth - 48, Math.max(54, hovered.x)),
-                      top: "88%",
-                    }}
-                  >
-                    {formatDate(hovered.payout.payoutDate)}
-                  </div>
-                  <div
-                    className="pointer-events-none absolute z-10 -translate-x-full -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
-                    style={{ left: hovered.axisX, top: hovered.y }}
-                  >
+                  <div aria-hidden="true" className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-300/35" style={{ left: hovered.x, top: hovered.axisY }} />
+                  <div aria-hidden="true" className="pointer-events-none absolute z-10 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-sky-300/35" style={{ left: hovered.axisX, top: hovered.y }} />
+                </>
+              )}
+              {hovered && hoveredDate && (
+                <>
+                  {showTimeHoverCard && (
+                    <div className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg" style={{ left: Math.min(chartWidth - 48, Math.max(54, hovered.x)), top: "88%" }}>
+                      {monthFormatter.format(hoveredDate)} {hoveredDate.getUTCDate()}
+                    </div>
+                  )}
+                  <div className="pointer-events-none absolute z-20 -translate-x-full -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg" style={{ left: hovered.axisX, top: hovered.y }}>
                     {numberFormatter.format(hovered.payout.payoutAmount)}
                   </div>
                 </>
               )}
+              <div className="pointer-events-none absolute inset-y-3 left-1 w-[5%] text-right text-slate-400">
+                {yTicks.map(({ label, ratio, position }) => (
+                  <span key={ratio} className="absolute right-0 -translate-y-1/2 text-xs font-medium" style={{ top: `${position}%` }}>{label}</span>
+                ))}
+              </div>
+              <div className="pointer-events-none absolute bottom-[8%] left-[6%] right-[3%] text-[10px] text-slate-500">
+                {yearTicks.map((tick) => (
+                  <span key={tick.year} className="absolute -translate-x-1/2 text-center text-xs font-medium text-slate-400" style={{ left: `${((tick.position - 6) / 91) * 100}%` }}>{tick.year}</span>
+                ))}
+                {tickLabels.map((tick) => (
+                  <span key={tick.date} className="absolute -translate-x-1/2 whitespace-nowrap text-center" style={{ left: `${((tick.position - 6) / 91) * 100}%` }}>{tick.label}</span>
+                ))}
+              </div>
             </>
           ) : (
-            <div className="grid h-full place-items-center text-sm text-slate-400">
-              No dividend payouts in this date range.
-            </div>
+            <div className="grid h-full place-items-center text-sm text-slate-400">No dividend payouts in this date range.</div>
           )}
         </div>
       )}
