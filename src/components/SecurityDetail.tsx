@@ -679,8 +679,11 @@ function Chart({
                 </div>
               )}
               <div
-                className="pointer-events-none absolute z-20 -translate-x-full -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
-                style={{ left: hovered.axisX, top: hovered.y }}
+                className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg"
+                style={{
+                  left: Math.min(chartWidth - 48, Math.max(54, hovered.x)),
+                  top: Math.max(18, hovered.y - 10),
+                }}
               >
                 {numberFormatter.format(hovered.point.average)}
               </div>
@@ -1143,6 +1146,7 @@ function DividendChart({
                 <line x1="6" x2="97" y1="86" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
                 <line x1="6" x2="6" y1="10" y2="86" stroke="#7dd3fc" strokeOpacity="0.35" strokeWidth="0.4" vectorEffect="non-scaling-stroke" />
                 {visiblePayouts.map((payout) => {
+                  const isHovered = hovered?.payout.id === payout.id;
                   const position = xForDate(payout.payoutDate);
                   const width = Math.min(1.25, 60 / calendarRange * 91 * 86_400_000);
                   const amountY = yForAmount(payout.payoutAmount);
@@ -1154,7 +1158,12 @@ function DividendChart({
                       width={width}
                       height={86 - amountY}
                       rx="0.35"
-                      fill="#34d399"
+                      fill={isHovered ? "#6ee7b7" : "#34d399"}
+                      style={
+                        isHovered
+                          ? { filter: "drop-shadow(0 0 6px rgba(52, 211, 153, 0.9))" }
+                          : undefined
+                      }
                     >
                       <title>{formatDate(payout.payoutDate)} · {numberFormatter.format(payout.payoutAmount)}</title>
                     </rect>
@@ -1180,7 +1189,7 @@ function DividendChart({
                       {monthFormatter.format(hoveredDate)} {hoveredDate.getUTCDate()}
                     </div>
                   )}
-                  <div className="pointer-events-none absolute z-20 -translate-x-full -translate-y-1/2 whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg" style={{ left: hovered.axisX, top: hovered.y }}>
+                  <div className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg" style={{ left: Math.min(chartWidth - 48, Math.max(54, hovered.x)), top: Math.max(18, hovered.y - 10) }}>
                     {numberFormatter.format(hovered.payout.payoutAmount)}
                   </div>
                 </>
