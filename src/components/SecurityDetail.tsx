@@ -788,6 +788,7 @@ function DividendChart({
     history.at(-1)?.payoutDate.slice(0, 10) ?? "",
   );
   const [logScale, setLogScale] = useState(true);
+  const [cardDistance, setCardDistance] = useState(10);
   const [showSettings, setShowSettings] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState(0);
@@ -1123,6 +1124,19 @@ function DividendChart({
                   className="h-9 rounded-lg border border-sky-200/15 bg-[#061d32] px-2 text-sm text-slate-100 outline-none focus:border-sky-400"
                 />
               </label>
+              <label className="grid gap-1 text-xs font-medium text-slate-400">
+                Price card distance ({cardDistance}px)
+                <input
+                  aria-label="Dividend price card distance"
+                  type="range"
+                  min="8"
+                  max="48"
+                  step="2"
+                  value={cardDistance}
+                  onChange={(event) => setCardDistance(Number(event.target.value))}
+                  className="h-2 cursor-pointer accent-sky-400"
+                />
+              </label>
               <button
                 type="button"
                 aria-label="Toggle dividend chart logarithmic scale"
@@ -1203,7 +1217,7 @@ function DividendChart({
                       {monthFormatter.format(hoveredDate)} {hoveredDate.getUTCDate()}
                     </div>
                   )}
-                  <div className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg" style={{ left: Math.min(chartWidth - 48, Math.max(54, hovered.x)), top: Math.max(18, hovered.y - 10) }}>
+                  <div className="pointer-events-none absolute z-20 -translate-x-1/2 -translate-y-full whitespace-nowrap rounded-md border border-sky-200/20 bg-[#08243d]/80 px-2 py-1 text-xs font-semibold text-white shadow-lg" style={{ left: Math.min(chartWidth - 48, Math.max(54, hovered.x)), top: Math.max(18, hovered.y - cardDistance) }}>
                     {numberFormatter.format(hovered.payout.payoutAmount)}
                   </div>
                 </>
