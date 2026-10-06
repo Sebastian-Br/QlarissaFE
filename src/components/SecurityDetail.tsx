@@ -53,6 +53,10 @@ const numberFormatter = new Intl.NumberFormat(undefined, {
 const axisNumberFormatter = new Intl.NumberFormat(undefined, {
   maximumFractionDigits: 0,
 });
+const dividendAxisNumberFormatter = new Intl.NumberFormat(undefined, {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+});
 const compactFormatter = new Intl.NumberFormat(undefined, {
   notation: "compact",
   maximumFractionDigits: 2,
@@ -869,7 +873,7 @@ function DividendChart({
         const value = index === 0 ? minValue : Math.max(0, rawValue);
         return {
           ratio,
-          label: numberFormatter.format(value),
+          label: dividendAxisNumberFormatter.format(value),
           position: Math.max(10, Math.min(86, yForAmount(value))),
         };
       })
@@ -877,7 +881,7 @@ function DividendChart({
         const value = max * ratio;
         return {
           ratio,
-          label: axisNumberFormatter.format(value),
+          label: dividendAxisNumberFormatter.format(value),
           position: yForAmount(value),
         };
       });
