@@ -1,11 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-} from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   HubConnectionBuilder,
   HubConnectionState,
@@ -18,6 +11,7 @@ import {
   ExternalLink,
   Info,
   LineChart,
+  Pin,
   RefreshCw,
   Settings,
   Star,
@@ -1465,40 +1459,14 @@ function StarToggle({
   watchlist: WatchlistMinimal | undefined;
   loadError: boolean;
 }) {
-  const [isCardOpen, setIsCardOpen] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!isCardOpen) return;
-    const handlePointerDown = (event: MouseEvent) => {
-      if (!wrapperRef.current?.contains(event.target as Node)) setIsCardOpen(false);
-    };
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setIsCardOpen(false);
-    };
-    document.addEventListener("mousedown", handlePointerDown);
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", handlePointerDown);
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [isCardOpen]);
-
-  const handleContextMenu = (event: ReactMouseEvent) => {
-    if (!watchlist) return;
-    event.preventDefault();
-    setIsCardOpen((open) => !open);
-  };
-
   return (
-    <div ref={wrapperRef} className="group relative shrink-0">
+    <div className="group relative shrink-0">
       <button
         type="button"
         aria-label={label}
         aria-pressed={pressed}
         disabled={!watchlist}
         onClick={onToggle}
-        onContextMenu={handleContextMenu}
         className={`rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] ${
           pressed ? "text-sky-300" : "text-slate-500 enabled:hover:text-sky-300"
         }`}
@@ -1511,16 +1479,16 @@ function StarToggle({
         />
       </button>
       {loadError && (
-        <div className="pointer-events-none absolute left-0 top-full z-20 mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm text-slate-400 shadow-xl shadow-slate-950/40 group-hover:block">
+        <div className="absolute left-0 top-full z-20 mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm text-slate-400 shadow-xl shadow-slate-950/40 group-hover:block">
           Could not load watchlists
         </div>
       )}
-      {watchlist && isCardOpen && (
-        <div className="absolute left-0 top-full z-20 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40">
+      {watchlist && (
+        <div className="absolute left-0 top-full z-20 mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40 group-hover:block">
           <p className="font-semibold text-white">{watchlist.name}</p>
           <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
             <span>Pinned</span>
-            <Star
+            <Pin
               size={16}
               className="text-sky-300"
               fill={watchlist.isPinned ? "currentColor" : "none"}
