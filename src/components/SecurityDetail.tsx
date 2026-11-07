@@ -1479,28 +1479,32 @@ function StarToggle({
         />
       </button>
       {loadError && (
-        <div className="absolute left-0 top-full z-20 mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm text-slate-400 shadow-xl shadow-slate-950/40 group-hover:block">
-          Could not load watchlists
+        <div className="absolute left-0 top-full z-20 hidden w-64 max-w-[calc(100vw-2rem)] pt-2 group-hover:block">
+          <div className="rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm text-slate-400 shadow-xl shadow-slate-950/40">
+            Could not load watchlists
+          </div>
         </div>
       )}
       {watchlist && (
-        <div className="absolute left-0 top-full z-20 mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40 group-hover:block">
-          <p className="font-semibold text-white">{watchlist.name}</p>
-          <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
-            <span>Pinned</span>
-            <Pin
-              size={16}
-              className="text-sky-300"
-              fill={watchlist.isPinned ? "currentColor" : "none"}
-              aria-label={watchlist.isPinned ? "Pinned" : "Not pinned"}
-              role="img"
-            />
-          </div>
-          <div className="mt-2 flex items-center justify-between gap-3 text-slate-400">
-            <span>Tracked change duration (days)</span>
-            <span className="font-medium text-white">
-              {watchlist.trackedChangeDurationTradingDays}
-            </span>
+        <div className="absolute left-0 top-full z-20 hidden w-64 max-w-[calc(100vw-2rem)] pt-2 group-hover:block">
+          <div className="rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40">
+            <p className="font-semibold text-white">{watchlist.name}</p>
+            <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
+              <span>Pinned</span>
+              <Pin
+                size={16}
+                className="text-sky-300"
+                fill={watchlist.isPinned ? "currentColor" : "none"}
+                aria-label={watchlist.isPinned ? "Pinned" : "Not pinned"}
+                role="img"
+              />
+            </div>
+            <div className="mt-2 flex items-center justify-between gap-3 text-slate-400">
+              <span>Tracked change duration (days)</span>
+              <span className="font-medium text-white">
+                {watchlist.trackedChangeDurationTradingDays}
+              </span>
+            </div>
           </div>
         </div>
       )}
