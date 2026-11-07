@@ -15,3 +15,54 @@ export async function getWatchlistsMinimal(): Promise<WatchlistMinimal[]> {
 
   return response.json();
 }
+
+export async function getWatchlistIdsForSecurity(
+  securityId: number,
+  signal?: AbortSignal,
+): Promise<number[]> {
+  const token = localStorage.getItem("jwt");
+  const response = await fetch(
+    `${BASE_URL}/api/Watchlist/GetWatchlistIdsForSecurity?securityId=${encodeURIComponent(securityId)}`,
+    {
+      signal,
+      headers: {
+        accept: "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (!response.ok) throw new Error("Unable to load watchlist membership.");
+
+  return response.json();
+}
+
+export async function watchSecurity(watchlistId: number, securityId: number): Promise<void> {
+  const token = localStorage.getItem("jwt");
+  const response = await fetch(
+    `${BASE_URL}/api/Watchlist/WatchSecurityAsync?watchlistId=${encodeURIComponent(watchlistId)}&securityId=${encodeURIComponent(securityId)}`,
+    {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (!response.ok) throw new Error("Unable to add security to watchlist.");
+}
+
+export async function unwatchSecurity(watchlistId: number, securityId: number): Promise<void> {
+  const token = localStorage.getItem("jwt");
+  const response = await fetch(
+    `${BASE_URL}/api/Watchlist/UnwatchSecurityAsync?watchlistId=${encodeURIComponent(watchlistId)}&securityId=${encodeURIComponent(securityId)}`,
+    {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    },
+  );
+
+  if (!response.ok) throw new Error("Unable to remove security from watchlist.");
+}

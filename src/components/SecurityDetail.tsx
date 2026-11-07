@@ -18,7 +18,12 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getSecurity, updateSecurity } from "@/api/securityApi";
-import { getWatchlistsMinimal } from "@/api/watchlistApi";
+import {
+  getWatchlistIdsForSecurity,
+  getWatchlistsMinimal,
+  unwatchSecurity,
+  watchSecurity,
+} from "@/api/watchlistApi";
 import type { WatchlistMinimal } from "@/models/WatchlistMinimal";
 import {
   SecurityType,
@@ -1450,6 +1455,7 @@ function StarToggle({
   pressed,
   onToggle,
   watchlist,
+  disabled,
   loadError,
 }: {
   label: string;
@@ -1457,6 +1463,7 @@ function StarToggle({
   pressed: boolean;
   onToggle: () => void;
   watchlist: WatchlistMinimal | undefined;
+  disabled: boolean;
   loadError: boolean;
 }) {
   return (
@@ -1465,7 +1472,7 @@ function StarToggle({
         type="button"
         aria-label={label}
         aria-pressed={pressed}
-        disabled={!watchlist}
+        disabled={disabled || !watchlist}
         onClick={onToggle}
         className={`rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] ${
           pressed ? "text-sky-300" : "text-slate-500 enabled:hover:text-sky-300"
@@ -1524,12 +1531,17 @@ export default function SecurityDetail() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [isBusinessSummaryExpanded, setIsBusinessSummaryExpanded] = useState(false);
-  const [isStarredLarge, setIsStarredLarge] = useState(false);
-  const [isStarredSmall, setIsStarredSmall] = useState(false);
   const [watchlists, setWatchlists] = useState<WatchlistMinimal[] | null>(null);
+  const [watchedWatchlistIds, setWatchedWatchlistIds] = useState<number[] | null>(null);
+  const [togglingWatchlistId, setTogglingWatchlistId] = useState<number | null>(null);
   const [watchlistsFailed, setWatchlistsFailed] = useState(false);
   const primaryWatchlist = watchlists?.find((watchlist) => watchlist.isPrimary);
   const secondaryWatchlist = watchlists?.find((watchlist) => watchlist.isSecondary);
+  const starsReady = watchlists !== null && watchedWatchlistIds !== null;
+  const isStarredLarge =
+    !!primaryWatchlist && !!watchedWatchlistIds?.includes(primaryWatchlist.id);
+  const isStarredSmall =
+    !!secondaryWatchlist && !!watchedWatchlistIds?.includes(secondaryWatchlist.id);
   const businessSummaryRef = useRef<HTMLParagraphElement>(null);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1546,6 +1558,7 @@ export default function SecurityDetail() {
     setIsBusinessSummaryExpanded(false);
     setError(false);
     setWatchlists(null);
+    setWatchedWatchlistIds(null);
     setWatchlistsFailed(false);
     getSecurity(securityId, controller.signal)
       .then((loadedSecurity) => {
@@ -1559,8 +1572,33 @@ export default function SecurityDetail() {
     getWatchlistsMinimal()
       .then(setWatchlists)
       .catch(() => setWatchlistsFailed(true));
+    getWatchlistIdsForSecurity(securityId, controller.signal)
+      .then(setWatchedWatchlistIds)
+      .catch((cause) => {
+        if (!(cause instanceof DOMException && cause.name === "AbortError"))
+          setWatchlistsFailed(true);
+      });
     return () => controller.abort();
   }, [securityId]);
+
+  const toggleWatchlist = async (watchlist: WatchlistMinimal) => {
+    const isWatched = watchedWatchlistIds?.includes(watchlist.id) ?? false;
+    setTogglingWatchlistId(watchlist.id);
+    try {
+      if (isWatched) await unwatchSecurity(watchlist.id, securityId);
+      else await watchSecurity(watchlist.id, securityId);
+      setWatchedWatchlistIds((ids) => {
+        const current = ids ?? [];
+        return isWatched
+          ? current.filter((id) => id !== watchlist.id)
+          : [...current, watchlist.id];
+      });
+    } catch {
+      // A failed request leaves the star in its last server-confirmed state.
+    } finally {
+      setTogglingWatchlistId(null);
+    }
+  };
 
   const handleUpdate = async () => {
     if (isUpdating) return;
@@ -1784,16 +1822,18 @@ export default function SecurityDetail() {
                     label="Star security"
                     size={28}
                     pressed={isStarredLarge}
-                    onToggle={() => setIsStarredLarge((value) => !value)}
+                    onToggle={() => primaryWatchlist && toggleWatchlist(primaryWatchlist)}
                     watchlist={primaryWatchlist}
+                    disabled={!starsReady || togglingWatchlistId !== null}
                     loadError={watchlistsFailed}
                   />
                   <StarToggle
                     label="Star security (secondary)"
                     size={20}
                     pressed={isStarredSmall}
-                    onToggle={() => setIsStarredSmall((value) => !value)}
+                    onToggle={() => secondaryWatchlist && toggleWatchlist(secondaryWatchlist)}
                     watchlist={secondaryWatchlist}
+                    disabled={!starsReady || togglingWatchlistId !== null}
                     loadError={watchlistsFailed}
                   />
                 </div>
