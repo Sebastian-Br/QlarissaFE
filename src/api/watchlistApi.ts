@@ -16,6 +16,23 @@ export async function getWatchlistsMinimal(): Promise<WatchlistMinimal[]> {
   return response.json();
 }
 
+export async function updateWatchlist(watchlist: WatchlistMinimal): Promise<WatchlistMinimal> {
+  const token = localStorage.getItem("jwt");
+  const response = await fetch(`${BASE_URL}/api/Watchlist/UpdateWatchlist`, {
+    method: "PUT",
+    headers: {
+      accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(watchlist),
+  });
+
+  if (!response.ok) throw new Error("Unable to update watchlist.");
+
+  return response.json();
+}
+
 export async function getWatchlistIdsForSecurity(
   securityId: number,
   signal?: AbortSignal,

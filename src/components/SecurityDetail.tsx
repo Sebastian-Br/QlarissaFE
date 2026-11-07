@@ -22,6 +22,7 @@ import {
   getWatchlistIdsForSecurity,
   getWatchlistsMinimal,
   unwatchSecurity,
+  updateWatchlist,
   watchSecurity,
 } from "@/api/watchlistApi";
 import type { WatchlistMinimal } from "@/models/WatchlistMinimal";
@@ -1456,6 +1457,8 @@ function StarToggle({
   onToggle,
   watchlist,
   disabled,
+  saving,
+  onSave,
   loadError,
 }: {
   label: string;
@@ -1464,10 +1467,27 @@ function StarToggle({
   onToggle: () => void;
   watchlist: WatchlistMinimal | undefined;
   disabled: boolean;
+  saving: boolean;
+  onSave: (watchlist: WatchlistMinimal, changes: Partial<WatchlistMinimal>) => Promise<boolean>;
   loadError: boolean;
 }) {
+  const durationInputRef = useRef<HTMLInputElement>(null);
+
+  const commitDuration = async (current: WatchlistMinimal, input: HTMLInputElement) => {
+    const days = input.valueAsNumber;
+    if (!Number.isInteger(days) || days < 1 || days === current.trackedChangeDurationTradingDays) {
+      input.value = String(current.trackedChangeDurationTradingDays);
+      return;
+    }
+    const saved = await onSave(current, { trackedChangeDurationTradingDays: days });
+    if (!saved) input.value = String(current.trackedChangeDurationTradingDays);
+  };
+
   return (
-    <div className="group relative shrink-0">
+    <div
+      className="group relative shrink-0"
+      onMouseLeave={() => durationInputRef.current?.blur()}
+    >
       <button
         type="button"
         aria-label={label}
@@ -1497,19 +1517,40 @@ function StarToggle({
           <div className="rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40">
             <div className="flex items-center gap-3">
               <p className="font-semibold text-white">{watchlist.name}</p>
-              <Pin
-                size={16}
-                className="shrink-0 text-sky-300"
-                fill={watchlist.isPinned ? "currentColor" : "none"}
-                aria-label={watchlist.isPinned ? "Pinned" : "Not pinned"}
-                role="img"
-              />
+              <button
+                type="button"
+                aria-label={watchlist.isPinned ? "Unpin watchlist" : "Pin watchlist"}
+                aria-pressed={watchlist.isPinned}
+                disabled={saving}
+                onClick={() => onSave(watchlist, { isPinned: !watchlist.isPinned })}
+                className={`shrink-0 rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] ${
+                  watchlist.isPinned ? "text-sky-300" : "text-slate-500 enabled:hover:text-sky-300"
+                }`}
+              >
+                <Pin
+                  size={16}
+                  fill={watchlist.isPinned ? "currentColor" : "none"}
+                  aria-hidden="true"
+                />
+              </button>
             </div>
             <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
               <span>Tracked change duration (days)</span>
-              <span className="font-medium text-white">
-                {watchlist.trackedChangeDurationTradingDays}
-              </span>
+              <input
+                key={watchlist.trackedChangeDurationTradingDays}
+                ref={durationInputRef}
+                type="number"
+                min={1}
+                step={1}
+                defaultValue={watchlist.trackedChangeDurationTradingDays}
+                aria-label="Tracked change duration (days)"
+                disabled={saving}
+                onBlur={(event) => commitDuration(watchlist, event.currentTarget)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+                className="w-20 rounded-md border border-sky-200/15 bg-slate-950 px-2 py-1 text-right font-medium text-white transition-colors duration-200 hover:border-sky-300/40 focus-visible:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
+              />
             </div>
           </div>
         </div>
@@ -1533,6 +1574,7 @@ export default function SecurityDetail() {
   const [watchlists, setWatchlists] = useState<WatchlistMinimal[] | null>(null);
   const [watchedWatchlistIds, setWatchedWatchlistIds] = useState<number[] | null>(null);
   const [togglingWatchlistId, setTogglingWatchlistId] = useState<number | null>(null);
+  const [savingWatchlistId, setSavingWatchlistId] = useState<number | null>(null);
   const [watchlistsFailed, setWatchlistsFailed] = useState(false);
   const primaryWatchlist = watchlists?.find((watchlist) => watchlist.isPrimary);
   const secondaryWatchlist = watchlists?.find((watchlist) => watchlist.isSecondary);
@@ -1596,6 +1638,24 @@ export default function SecurityDetail() {
       // A failed request leaves the star in its last server-confirmed state.
     } finally {
       setTogglingWatchlistId(null);
+    }
+  };
+
+  const saveWatchlist = async (
+    watchlist: WatchlistMinimal,
+    changes: Partial<WatchlistMinimal>,
+  ): Promise<boolean> => {
+    setSavingWatchlistId(watchlist.id);
+    try {
+      const updated = await updateWatchlist({ ...watchlist, ...changes });
+      setWatchlists(
+        (current) => current?.map((item) => (item.id === updated.id ? updated : item)) ?? null,
+      );
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setSavingWatchlistId(null);
     }
   };
 
@@ -1824,6 +1884,8 @@ export default function SecurityDetail() {
                     onToggle={() => primaryWatchlist && toggleWatchlist(primaryWatchlist)}
                     watchlist={primaryWatchlist}
                     disabled={!starsReady || togglingWatchlistId !== null}
+                    saving={savingWatchlistId !== null}
+                    onSave={saveWatchlist}
                     loadError={watchlistsFailed}
                   />
                   <StarToggle
@@ -1833,6 +1895,8 @@ export default function SecurityDetail() {
                     onToggle={() => secondaryWatchlist && toggleWatchlist(secondaryWatchlist)}
                     watchlist={secondaryWatchlist}
                     disabled={!starsReady || togglingWatchlistId !== null}
+                    saving={savingWatchlistId !== null}
+                    onSave={saveWatchlist}
                     loadError={watchlistsFailed}
                   />
                 </div>
