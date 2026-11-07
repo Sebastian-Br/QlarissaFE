@@ -33,6 +33,23 @@ export async function updateWatchlist(watchlist: WatchlistMinimal): Promise<Watc
   return response.json();
 }
 
+export async function addWatchlist(watchlist: WatchlistMinimal): Promise<WatchlistMinimal> {
+  const token = localStorage.getItem("jwt");
+  const response = await fetch(`${BASE_URL}/api/Watchlist/AddWatchlist`, {
+    method: "POST",
+    headers: {
+      accept: "application/json",
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
+    body: JSON.stringify(watchlist),
+  });
+
+  if (!response.ok) throw new Error("Unable to create watchlist.");
+
+  return response.json();
+}
+
 export async function getWatchlistIdsForSecurity(
   securityId: number,
   signal?: AbortSignal,
