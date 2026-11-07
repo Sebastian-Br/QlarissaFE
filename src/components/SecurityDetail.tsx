@@ -1651,7 +1651,7 @@ function CreateWatchlistDialog({
     disabled: boolean;
     disabledReason: string;
   }[] = [
-    { value: "none", label: "Neither", disabled: false, disabledReason: "" },
+    { value: "none", label: "Default", disabled: false, disabledReason: "" },
     {
       value: "primary",
       label: "Primary",
@@ -1825,6 +1825,7 @@ function StarToggle({
 }) {
   const durationInputRef = useRef<HTMLInputElement>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
+  const [isDurationTipOpen, setIsDurationTipOpen] = useState(false);
 
   const commitName = async (current: WatchlistMinimal, input: HTMLInputElement) => {
     const name = input.value.trim();
@@ -1911,7 +1912,13 @@ function StarToggle({
               </button>
             </div>
             <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
-              <span>Tracked change duration (days)</span>
+              <span
+                onMouseEnter={() => setIsDurationTipOpen(true)}
+                onMouseLeave={() => setIsDurationTipOpen(false)}
+                className="cursor-help underline decoration-dotted decoration-slate-500 underline-offset-4"
+              >
+                Tracked change duration (days)
+              </span>
               <TrackedDurationInput
                 key={watchlist.trackedChangeDurationTradingDays}
                 inputRef={durationInputRef}
@@ -1921,6 +1928,15 @@ function StarToggle({
               />
             </div>
           </div>
+          {isDurationTipOpen && (
+            <div
+              role="tooltip"
+              className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-sky-200/15 bg-slate-800 px-3 py-2 text-xs leading-relaxed text-slate-100 shadow-xl"
+            >
+              Set this to 1 to create a daily watchlist, or to 5 for a weekly one. Qlarissa will track
+              changes to the security price over this period when displaying your watchlist!
+            </div>
+          )}
         </div>
       )}
     </div>
