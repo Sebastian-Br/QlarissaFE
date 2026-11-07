@@ -1536,21 +1536,51 @@ function StarToggle({
             </div>
             <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
               <span>Tracked change duration (days)</span>
-              <input
-                key={watchlist.trackedChangeDurationTradingDays}
-                ref={durationInputRef}
-                type="number"
-                min={1}
-                step={1}
-                defaultValue={watchlist.trackedChangeDurationTradingDays}
-                aria-label="Tracked change duration (days)"
-                disabled={saving}
-                onBlur={(event) => commitDuration(watchlist, event.currentTarget)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") event.currentTarget.blur();
-                }}
-                className="w-20 rounded-md border border-sky-200/15 bg-slate-950 px-2 py-1 text-right font-medium text-white transition-colors duration-200 hover:border-sky-300/40 focus-visible:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
-              />
+              <div className="flex items-center gap-1">
+                <input
+                  key={watchlist.trackedChangeDurationTradingDays}
+                  ref={durationInputRef}
+                  type="number"
+                  min={1}
+                  step={1}
+                  defaultValue={watchlist.trackedChangeDurationTradingDays}
+                  aria-label="Tracked change duration (days)"
+                  disabled={saving}
+                  onBlur={(event) => commitDuration(watchlist, event.currentTarget)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") event.currentTarget.blur();
+                  }}
+                  className="w-16 rounded-md border border-sky-200/15 bg-slate-950 px-2 py-1 text-right font-medium text-white transition-colors duration-200 [appearance:textfield] hover:border-sky-300/40 focus-visible:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                />
+                <div className="flex flex-col">
+                  {[
+                    { delta: 1, label: "Increase tracked change duration", points: "0,6 10,6 5,0" },
+                    { delta: -1, label: "Decrease tracked change duration", points: "0,0 10,0 5,6" },
+                  ].map(({ delta, label, points }) => (
+                    <button
+                      key={delta}
+                      type="button"
+                      aria-label={label}
+                      disabled={saving}
+                      onMouseDown={(event) => event.preventDefault()}
+                      onClick={() => {
+                        const input = durationInputRef.current;
+                        if (!input) return;
+                        const current = Number.isInteger(input.valueAsNumber)
+                          ? input.valueAsNumber
+                          : watchlist.trackedChangeDurationTradingDays;
+                        input.value = String(Math.max(1, current + delta));
+                        input.focus();
+                      }}
+                      className="flex h-3.5 w-5 items-center justify-center rounded-sm text-slate-500 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 enabled:hover:text-sky-300 disabled:cursor-not-allowed disabled:text-slate-700"
+                    >
+                      <svg width="10" height="6" viewBox="0 0 10 6" aria-hidden="true">
+                        <polygon points={points} fill="currentColor" />
+                      </svg>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
