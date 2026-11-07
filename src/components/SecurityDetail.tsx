@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import {
   HubConnectionBuilder,
   HubConnectionState,
@@ -12,13 +12,21 @@ import {
   Info,
   LineChart,
   Pin,
+  Plus,
   RefreshCw,
   Settings,
   Star,
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getSecurity, updateSecurity } from "@/api/securityApi";
-import { getWatchlistsMinimal } from "@/api/watchlistApi";
+import {
+  addWatchlist,
+  getWatchlistIdsForSecurity,
+  getWatchlistsMinimal,
+  unwatchSecurity,
+  updateWatchlist,
+  watchSecurity,
+} from "@/api/watchlistApi";
 import type { WatchlistMinimal } from "@/models/WatchlistMinimal";
 import {
   SecurityType,
@@ -29,6 +37,7 @@ import {
   type Security,
   type Stock,
 } from "@/models/Security";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const typeNames: Record<SecurityType, string> = {
   [SecurityType.Stock]: "Stock",
@@ -1444,12 +1453,364 @@ function Splits({
   );
 }
 
+const durationSteps = [
+  { delta: 1, label: "Increase tracked change duration", points: "0,6 10,6 5,0" },
+  { delta: -1, label: "Decrease tracked change duration", points: "0,0 10,0 5,6" },
+];
+
+function TrackedDurationInput({
+  inputRef,
+  defaultValue,
+  disabled,
+  onCommit,
+}: {
+  inputRef: { current: HTMLInputElement | null };
+  defaultValue: number;
+  disabled: boolean;
+  onCommit?: (input: HTMLInputElement) => void;
+}) {
+  const step = (delta: number) => {
+    const input = inputRef.current;
+    if (!input) return;
+    const current = Number.isInteger(input.valueAsNumber) ? input.valueAsNumber : 0;
+    input.value = String(Math.max(1, current + delta));
+    input.focus();
+  };
+
+  return (
+    <div className="flex items-center gap-1">
+      <input
+        ref={inputRef}
+        type="number"
+        min={1}
+        step={1}
+        defaultValue={defaultValue}
+        aria-label="Tracked change duration (days)"
+        disabled={disabled}
+        onBlur={(event) => onCommit?.(event.currentTarget)}
+        onKeyDown={(event) => {
+          if (event.key === "Enter") event.currentTarget.blur();
+        }}
+        className="w-16 rounded-md border border-sky-200/15 bg-slate-950 px-2 py-1 text-right font-medium text-white transition-colors duration-200 [appearance:textfield] hover:border-sky-300/40 focus-visible:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <div className="flex flex-col">
+        {durationSteps.map(({ delta, label, points }) => (
+          <button
+            key={delta}
+            type="button"
+            aria-label={label}
+            disabled={disabled}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => step(delta)}
+            className="flex h-3.5 w-5 items-center justify-center rounded-sm text-slate-500 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 enabled:hover:text-sky-300 disabled:cursor-not-allowed disabled:text-slate-700"
+          >
+            <svg width="10" height="6" viewBox="0 0 10 6" aria-hidden="true">
+              <polygon points={points} fill="currentColor" />
+            </svg>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function AddToWatchlistMenu({
+  watchlists,
+  watchedIds,
+  disabled,
+  onToggle,
+  onCreate,
+}: {
+  watchlists: WatchlistMinimal[];
+  watchedIds: number[];
+  disabled: boolean;
+  onToggle: (watchlist: WatchlistMinimal) => void;
+  onCreate: () => void;
+}) {
+  const otherWatchlists = watchlists.filter((watchlist) => !watchlist.isPrimary && !watchlist.isSecondary);
+
+  return (
+    <div className="group relative shrink-0">
+      <button
+        type="button"
+        aria-label="Add security to another watchlist"
+        disabled={disabled}
+        className="rounded-full p-1 text-slate-500 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:text-sky-300"
+      >
+        <Plus size={20} aria-hidden="true" />
+      </button>
+      <div className="absolute left-0 top-full z-20 hidden w-64 max-w-[calc(100vw-2rem)] pt-2 group-focus-within:block group-hover:block">
+        <div className="rounded-xl border border-sky-200/15 bg-slate-900 p-2 text-sm shadow-xl shadow-slate-950/40">
+          {otherWatchlists.length === 0 && (
+            <p className="px-2 py-1.5 text-slate-400">No other watchlists</p>
+          )}
+          {otherWatchlists.map((watchlist) => {
+            const pressed = watchedIds.includes(watchlist.id);
+            return (
+              <div
+                key={watchlist.id}
+                className="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-slate-800/60"
+              >
+                <span className="truncate font-semibold text-white">{watchlist.name}</span>
+                <button
+                  type="button"
+                  aria-label={
+                    pressed
+                      ? `Remove security from ${watchlist.name}`
+                      : `Add security to ${watchlist.name}`
+                  }
+                  aria-pressed={pressed}
+                  disabled={disabled}
+                  onClick={() => onToggle(watchlist)}
+                  className={`shrink-0 rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] ${
+                    pressed ? "text-sky-300" : "text-slate-500 enabled:hover:text-sky-300"
+                  }`}
+                >
+                  <Star size={16} fill={pressed ? "currentColor" : "none"} strokeWidth={2} aria-hidden="true" />
+                </button>
+              </div>
+            );
+          })}
+          <button
+            type="button"
+            onClick={onCreate}
+            disabled={disabled}
+            className="mt-1 w-full rounded-lg border-t border-sky-200/10 px-2 pt-2.5 pb-1.5 text-left font-medium text-sky-300 transition-colors hover:text-sky-200 disabled:cursor-not-allowed disabled:text-slate-700"
+          >
+            Create watchlist
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+type WatchlistKind = "none" | "primary" | "secondary";
+
+function CreateWatchlistDialog({
+  hasPrimary,
+  hasSecondary,
+  onClose,
+  onCreated,
+}: {
+  hasPrimary: boolean;
+  hasSecondary: boolean;
+  onClose: () => void;
+  onCreated: (watchlist: WatchlistMinimal) => void;
+}) {
+  const [name, setName] = useState("");
+  const [kind, setKind] = useState<WatchlistKind>("none");
+  const [isPinned, setIsPinned] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const durationInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  const submit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const trimmedName = name.trim();
+    const days = durationInputRef.current?.valueAsNumber ?? Number.NaN;
+    if (!trimmedName) {
+      setError("Enter a name for the watchlist.");
+      return;
+    }
+    if (!Number.isInteger(days) || days < 1) {
+      setError("Tracked change duration must be a whole number of at least 1.");
+      return;
+    }
+
+    setError(null);
+    setSubmitting(true);
+    try {
+      const created = await addWatchlist({
+        id: 0,
+        name: trimmedName,
+        isPrimary: kind === "primary",
+        isSecondary: kind === "secondary",
+        isPinned,
+        pinPosition: 0,
+        trackedChangeDurationTradingDays: days,
+      });
+      onCreated(created);
+    } catch {
+      setError("Unable to create watchlist.");
+      setSubmitting(false);
+    }
+  };
+
+  const kindOptions: {
+    value: WatchlistKind;
+    label: string;
+    disabled: boolean;
+    disabledReason: string;
+  }[] = [
+    { value: "none", label: "Default", disabled: false, disabledReason: "" },
+    {
+      value: "primary",
+      label: "Primary",
+      disabled: hasPrimary,
+      disabledReason: "A primary watchlist already exists. Only one can exist at a time.",
+    },
+    {
+      value: "secondary",
+      label: "Secondary",
+      disabled: hasSecondary,
+      disabledReason: "A secondary watchlist already exists. Only one can exist at a time.",
+    },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 p-4"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-watchlist-title"
+        className="w-full max-w-md rounded-2xl border border-sky-200/15 bg-slate-900 p-6 shadow-2xl shadow-slate-950/60"
+      >
+        <h2 id="create-watchlist-title" className="text-lg font-semibold text-white">
+          Create watchlist
+        </h2>
+        <form onSubmit={submit} className="mt-5 flex flex-col gap-5">
+          <label className="flex flex-col gap-2 text-sm text-slate-400">
+            Name
+            <input
+              type="text"
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              disabled={submitting}
+              autoFocus
+              className="rounded-md border border-sky-200/15 bg-slate-950 px-3 py-2 text-white transition-colors hover:border-sky-300/40 focus-visible:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+          </label>
+
+          <fieldset className="flex flex-col gap-2 text-sm text-slate-400">
+            <legend className="mb-2">Type</legend>
+            <div className="flex flex-wrap gap-2">
+              {kindOptions.map((option) => (
+                <Tooltip key={option.value}>
+                  <TooltipTrigger asChild>
+                    <label
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${
+                        option.disabled
+                          ? "cursor-not-allowed border-sky-200/10 text-slate-600"
+                          : kind === option.value
+                            ? "cursor-pointer border-sky-300 bg-sky-400/15 text-sky-200"
+                            : "cursor-pointer border-sky-200/15 text-slate-300 hover:border-sky-300/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="watchlist-kind"
+                        value={option.value}
+                        checked={kind === option.value}
+                        disabled={option.disabled || submitting}
+                        onChange={() => setKind(option.value)}
+                        className="accent-sky-300"
+                      />
+                      {option.label}
+                    </label>
+                  </TooltipTrigger>
+                  {option.disabled && (
+                    <TooltipContent
+                      side="top"
+                      className="max-w-64 border border-sky-200/15 bg-slate-800 text-slate-100 shadow-xl"
+                    >
+                      {option.disabledReason}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+              ))}
+            </div>
+          </fieldset>
+
+          <div className="flex items-center justify-between gap-3 text-sm text-slate-400">
+            <span>Pin to dashboard</span>
+            <button
+              type="button"
+              aria-label="Pin watchlist"
+              aria-pressed={isPinned}
+              disabled={submitting}
+              onClick={() => setIsPinned((pinned) => !pinned)}
+              className={`rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] ${
+                isPinned ? "text-sky-300" : "text-slate-500 enabled:hover:text-sky-300"
+              }`}
+            >
+              <Pin size={16} fill={isPinned ? "currentColor" : "none"} aria-hidden="true" />
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 text-sm text-slate-400">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help underline decoration-dotted decoration-slate-500 underline-offset-4">
+                  Tracked change duration (days)
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="max-w-72 border border-sky-200/15 bg-slate-800 text-slate-100 shadow-xl"
+              >
+                Set this to 1 to create a daily watchlist, or to 5 for a weekly one. Qlarissa will track
+                changes to the security price over this period when displaying your watchlist!
+              </TooltipContent>
+            </Tooltip>
+            <TrackedDurationInput
+              inputRef={durationInputRef}
+              defaultValue={1}
+              disabled={submitting}
+            />
+          </div>
+
+          {error && (
+            <p role="alert" className="text-sm text-rose-300">
+              {error}
+            </p>
+          )}
+
+          <div className="mt-1 flex justify-end gap-3">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={submitting}
+              className="rounded-lg border border-sky-200/15 px-4 py-2 text-sm font-medium text-slate-300 transition-colors hover:border-sky-300/40 hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              className="rounded-lg bg-sky-400/20 px-4 py-2 text-sm font-semibold text-sky-200 transition-colors hover:bg-sky-400/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {submitting ? "Creating…" : "Create watchlist"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 function StarToggle({
   label,
   size,
   pressed,
   onToggle,
   watchlist,
+  disabled,
+  saving,
+  onSave,
   loadError,
 }: {
   label: string;
@@ -1457,15 +1818,47 @@ function StarToggle({
   pressed: boolean;
   onToggle: () => void;
   watchlist: WatchlistMinimal | undefined;
+  disabled: boolean;
+  saving: boolean;
+  onSave: (watchlist: WatchlistMinimal, changes: Partial<WatchlistMinimal>) => Promise<boolean>;
   loadError: boolean;
 }) {
+  const durationInputRef = useRef<HTMLInputElement>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const [isDurationTipOpen, setIsDurationTipOpen] = useState(false);
+
+  const commitName = async (current: WatchlistMinimal, input: HTMLInputElement) => {
+    const name = input.value.trim();
+    if (!name || name === current.name) {
+      input.value = current.name;
+      return;
+    }
+    const saved = await onSave(current, { name });
+    if (!saved) input.value = current.name;
+  };
+
+  const commitDuration = async (current: WatchlistMinimal, input: HTMLInputElement) => {
+    const days = input.valueAsNumber;
+    if (!Number.isInteger(days) || days < 1 || days === current.trackedChangeDurationTradingDays) {
+      input.value = String(current.trackedChangeDurationTradingDays);
+      return;
+    }
+    const saved = await onSave(current, { trackedChangeDurationTradingDays: days });
+    if (!saved) input.value = String(current.trackedChangeDurationTradingDays);
+  };
+
+  const blurFocusedField = () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && wrapperRef.current?.contains(active)) active.blur();
+  };
+
   return (
-    <div className="group relative shrink-0">
+    <div ref={wrapperRef} className="group relative shrink-0" onMouseLeave={blurFocusedField}>
       <button
         type="button"
         aria-label={label}
         aria-pressed={pressed}
-        disabled={!watchlist}
+        disabled={disabled || !watchlist}
         onClick={onToggle}
         className={`rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] ${
           pressed ? "text-sky-300" : "text-slate-500 enabled:hover:text-sky-300"
@@ -1488,24 +1881,62 @@ function StarToggle({
       {watchlist && (
         <div className="absolute left-0 top-full z-20 hidden w-64 max-w-[calc(100vw-2rem)] pt-2 group-hover:block">
           <div className="rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40">
-            <p className="font-semibold text-white">{watchlist.name}</p>
+            <div className="flex items-center gap-3">
+              <input
+                key={watchlist.name}
+                type="text"
+                defaultValue={watchlist.name}
+                aria-label="Watchlist name"
+                disabled={saving}
+                onBlur={(event) => commitName(watchlist, event.currentTarget)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") event.currentTarget.blur();
+                }}
+                className="min-w-0 flex-1 rounded-md border border-transparent bg-transparent px-1 py-0.5 font-semibold text-white transition-colors duration-200 hover:border-sky-200/15 focus-visible:border-sky-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              <button
+                type="button"
+                aria-label={watchlist.isPinned ? "Unpin watchlist" : "Pin watchlist"}
+                aria-pressed={watchlist.isPinned}
+                disabled={saving}
+                onClick={() => onSave(watchlist, { isPinned: !watchlist.isPinned })}
+                className={`shrink-0 rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] ${
+                  watchlist.isPinned ? "text-sky-300" : "text-slate-500 enabled:hover:text-sky-300"
+                }`}
+              >
+                <Pin
+                  size={16}
+                  fill={watchlist.isPinned ? "currentColor" : "none"}
+                  aria-hidden="true"
+                />
+              </button>
+            </div>
             <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
-              <span>Pinned</span>
-              <Pin
-                size={16}
-                className="text-sky-300"
-                fill={watchlist.isPinned ? "currentColor" : "none"}
-                aria-label={watchlist.isPinned ? "Pinned" : "Not pinned"}
-                role="img"
+              <span
+                onMouseEnter={() => setIsDurationTipOpen(true)}
+                onMouseLeave={() => setIsDurationTipOpen(false)}
+                className="cursor-help underline decoration-dotted decoration-slate-500 underline-offset-4"
+              >
+                Tracked change duration (days)
+              </span>
+              <TrackedDurationInput
+                key={watchlist.trackedChangeDurationTradingDays}
+                inputRef={durationInputRef}
+                defaultValue={watchlist.trackedChangeDurationTradingDays}
+                disabled={saving}
+                onCommit={(input) => commitDuration(watchlist, input)}
               />
             </div>
-            <div className="mt-2 flex items-center justify-between gap-3 text-slate-400">
-              <span>Tracked change duration (days)</span>
-              <span className="font-medium text-white">
-                {watchlist.trackedChangeDurationTradingDays}
-              </span>
-            </div>
           </div>
+          {isDurationTipOpen && (
+            <div
+              role="tooltip"
+              className="pointer-events-none absolute left-0 top-full z-30 mt-2 w-72 max-w-[calc(100vw-2rem)] rounded-lg border border-sky-200/15 bg-slate-800 px-3 py-2 text-xs leading-relaxed text-slate-100 shadow-xl"
+            >
+              Set this to 1 to create a daily watchlist, or to 5 for a weekly one. Qlarissa will track
+              changes to the security price over this period when displaying your watchlist!
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -1524,12 +1955,19 @@ export default function SecurityDetail() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [isBusinessSummaryExpanded, setIsBusinessSummaryExpanded] = useState(false);
-  const [isStarredLarge, setIsStarredLarge] = useState(false);
-  const [isStarredSmall, setIsStarredSmall] = useState(false);
   const [watchlists, setWatchlists] = useState<WatchlistMinimal[] | null>(null);
+  const [watchedWatchlistIds, setWatchedWatchlistIds] = useState<number[] | null>(null);
+  const [togglingWatchlistId, setTogglingWatchlistId] = useState<number | null>(null);
+  const [savingWatchlistId, setSavingWatchlistId] = useState<number | null>(null);
   const [watchlistsFailed, setWatchlistsFailed] = useState(false);
+  const [isCreateWatchlistOpen, setIsCreateWatchlistOpen] = useState(false);
   const primaryWatchlist = watchlists?.find((watchlist) => watchlist.isPrimary);
   const secondaryWatchlist = watchlists?.find((watchlist) => watchlist.isSecondary);
+  const starsReady = watchlists !== null && watchedWatchlistIds !== null;
+  const isStarredLarge =
+    !!primaryWatchlist && !!watchedWatchlistIds?.includes(primaryWatchlist.id);
+  const isStarredSmall =
+    !!secondaryWatchlist && !!watchedWatchlistIds?.includes(secondaryWatchlist.id);
   const businessSummaryRef = useRef<HTMLParagraphElement>(null);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1546,6 +1984,7 @@ export default function SecurityDetail() {
     setIsBusinessSummaryExpanded(false);
     setError(false);
     setWatchlists(null);
+    setWatchedWatchlistIds(null);
     setWatchlistsFailed(false);
     getSecurity(securityId, controller.signal)
       .then((loadedSecurity) => {
@@ -1559,8 +1998,51 @@ export default function SecurityDetail() {
     getWatchlistsMinimal()
       .then(setWatchlists)
       .catch(() => setWatchlistsFailed(true));
+    getWatchlistIdsForSecurity(securityId, controller.signal)
+      .then(setWatchedWatchlistIds)
+      .catch((cause) => {
+        if (!(cause instanceof DOMException && cause.name === "AbortError"))
+          setWatchlistsFailed(true);
+      });
     return () => controller.abort();
   }, [securityId]);
+
+  const toggleWatchlist = async (watchlist: WatchlistMinimal) => {
+    const isWatched = watchedWatchlistIds?.includes(watchlist.id) ?? false;
+    setTogglingWatchlistId(watchlist.id);
+    try {
+      if (isWatched) await unwatchSecurity(watchlist.id, securityId);
+      else await watchSecurity(watchlist.id, securityId);
+      setWatchedWatchlistIds((ids) => {
+        const current = ids ?? [];
+        return isWatched
+          ? current.filter((id) => id !== watchlist.id)
+          : [...current, watchlist.id];
+      });
+    } catch {
+      // A failed request leaves the star in its last server-confirmed state.
+    } finally {
+      setTogglingWatchlistId(null);
+    }
+  };
+
+  const saveWatchlist = async (
+    watchlist: WatchlistMinimal,
+    changes: Partial<WatchlistMinimal>,
+  ): Promise<boolean> => {
+    setSavingWatchlistId(watchlist.id);
+    try {
+      const updated = await updateWatchlist({ ...watchlist, ...changes });
+      setWatchlists(
+        (current) => current?.map((item) => (item.id === updated.id ? updated : item)) ?? null,
+      );
+      return true;
+    } catch {
+      return false;
+    } finally {
+      setSavingWatchlistId(null);
+    }
+  };
 
   const handleUpdate = async () => {
     if (isUpdating) return;
@@ -1784,18 +2266,42 @@ export default function SecurityDetail() {
                     label="Star security"
                     size={28}
                     pressed={isStarredLarge}
-                    onToggle={() => setIsStarredLarge((value) => !value)}
+                    onToggle={() => primaryWatchlist && toggleWatchlist(primaryWatchlist)}
                     watchlist={primaryWatchlist}
+                    disabled={!starsReady || togglingWatchlistId !== null}
+                    saving={savingWatchlistId !== null}
+                    onSave={saveWatchlist}
                     loadError={watchlistsFailed}
                   />
                   <StarToggle
                     label="Star security (secondary)"
                     size={20}
                     pressed={isStarredSmall}
-                    onToggle={() => setIsStarredSmall((value) => !value)}
+                    onToggle={() => secondaryWatchlist && toggleWatchlist(secondaryWatchlist)}
                     watchlist={secondaryWatchlist}
+                    disabled={!starsReady || togglingWatchlistId !== null}
+                    saving={savingWatchlistId !== null}
+                    onSave={saveWatchlist}
                     loadError={watchlistsFailed}
                   />
+                  <AddToWatchlistMenu
+                    watchlists={watchlists ?? []}
+                    watchedIds={watchedWatchlistIds ?? []}
+                    disabled={!starsReady || togglingWatchlistId !== null}
+                    onToggle={toggleWatchlist}
+                    onCreate={() => setIsCreateWatchlistOpen(true)}
+                  />
+                  {isCreateWatchlistOpen && (
+                    <CreateWatchlistDialog
+                      hasPrimary={!!primaryWatchlist}
+                      hasSecondary={!!secondaryWatchlist}
+                      onClose={() => setIsCreateWatchlistOpen(false)}
+                      onCreated={(created) => {
+                        setWatchlists((current) => [...(current ?? []), created]);
+                        setIsCreateWatchlistOpen(false);
+                      }}
+                    />
+                  )}
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="text-lg text-slate-400">
