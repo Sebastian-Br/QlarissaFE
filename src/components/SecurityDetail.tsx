@@ -1456,12 +1456,14 @@ function StarToggle({
   pressed,
   onToggle,
   watchlist,
+  loadError,
 }: {
   label: string;
   size: number;
   pressed: boolean;
   onToggle: () => void;
   watchlist: WatchlistMinimal | undefined;
+  loadError: boolean;
 }) {
   const [isCardOpen, setIsCardOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -1489,7 +1491,7 @@ function StarToggle({
   };
 
   return (
-    <div ref={wrapperRef} className="relative shrink-0">
+    <div ref={wrapperRef} className="group relative shrink-0">
       <button
         type="button"
         aria-label={label}
@@ -1508,23 +1510,28 @@ function StarToggle({
           aria-hidden="true"
         />
       </button>
+      {loadError && (
+        <div className="pointer-events-none absolute left-0 top-full z-20 mt-2 hidden w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm text-slate-400 shadow-xl shadow-slate-950/40 group-hover:block">
+          Could not load watchlists
+        </div>
+      )}
       {watchlist && isCardOpen && (
         <div className="absolute left-0 top-full z-20 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40">
-          <p className="font-semibold text-white">{watchlist.Name}</p>
+          <p className="font-semibold text-white">{watchlist.name}</p>
           <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
             <span>Pinned</span>
             <Star
               size={16}
               className="text-sky-300"
-              fill={watchlist.IsPinned ? "currentColor" : "none"}
-              aria-label={watchlist.IsPinned ? "Pinned" : "Not pinned"}
+              fill={watchlist.isPinned ? "currentColor" : "none"}
+              aria-label={watchlist.isPinned ? "Pinned" : "Not pinned"}
               role="img"
             />
           </div>
           <div className="mt-2 flex items-center justify-between gap-3 text-slate-400">
             <span>Tracked change duration (days)</span>
             <span className="font-medium text-white">
-              {watchlist.TrackedChangeDurationTradingDays}
+              {watchlist.trackedChangeDurationTradingDays}
             </span>
           </div>
         </div>
@@ -1547,9 +1554,10 @@ export default function SecurityDetail() {
   const [isBusinessSummaryExpanded, setIsBusinessSummaryExpanded] = useState(false);
   const [isStarredLarge, setIsStarredLarge] = useState(false);
   const [isStarredSmall, setIsStarredSmall] = useState(false);
-  const [watchlists, setWatchlists] = useState<WatchlistMinimal[]>([]);
-  const primaryWatchlist = watchlists.find((watchlist) => watchlist.IsPrimary);
-  const secondaryWatchlist = watchlists.find((watchlist) => watchlist.IsSecondary);
+  const [watchlists, setWatchlists] = useState<WatchlistMinimal[] | null>(null);
+  const [watchlistsFailed, setWatchlistsFailed] = useState(false);
+  const primaryWatchlist = watchlists?.find((watchlist) => watchlist.isPrimary);
+  const secondaryWatchlist = watchlists?.find((watchlist) => watchlist.isSecondary);
   const businessSummaryRef = useRef<HTMLParagraphElement>(null);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1565,7 +1573,8 @@ export default function SecurityDetail() {
     setLiveTimestamp(null);
     setIsBusinessSummaryExpanded(false);
     setError(false);
-    setWatchlists([]);
+    setWatchlists(null);
+    setWatchlistsFailed(false);
     getSecurity(securityId, controller.signal)
       .then((loadedSecurity) => {
         setSecurity(loadedSecurity);
@@ -1577,7 +1586,7 @@ export default function SecurityDetail() {
       });
     getWatchlistsMinimal()
       .then(setWatchlists)
-      .catch(() => setWatchlists([]));
+      .catch(() => setWatchlistsFailed(true));
     return () => controller.abort();
   }, [securityId]);
 
@@ -1805,6 +1814,7 @@ export default function SecurityDetail() {
                     pressed={isStarredLarge}
                     onToggle={() => setIsStarredLarge((value) => !value)}
                     watchlist={primaryWatchlist}
+                    loadError={watchlistsFailed}
                   />
                   <StarToggle
                     label="Star security (secondary)"
@@ -1812,6 +1822,7 @@ export default function SecurityDetail() {
                     pressed={isStarredSmall}
                     onToggle={() => setIsStarredSmall((value) => !value)}
                     watchlist={secondaryWatchlist}
+                    loadError={watchlistsFailed}
                   />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">

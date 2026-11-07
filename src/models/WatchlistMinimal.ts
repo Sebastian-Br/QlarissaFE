@@ -1,9 +1,9 @@
 export interface WatchlistMinimal {
-  Id: number;
-  Name: string;
-  IsPrimary: boolean;
-  IsSecondary: boolean;
-  IsPinned: boolean;
-  PinPosition: number;
-  TrackedChangeDurationTradingDays: number;
+  id: number;
+  name: string;
+  isPrimary: boolean;
+  isSecondary: boolean;
+  isPinned: boolean;
+  pinPosition: number;
+  trackedChangeDurationTradingDays: number;
 }
