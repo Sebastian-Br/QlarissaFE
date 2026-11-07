@@ -1762,8 +1762,8 @@ function CreateWatchlistDialog({
                 side="top"
                 className="max-w-72 border border-sky-200/15 bg-slate-800 text-slate-100 shadow-xl"
               >
-                Set this to 1 to create a daily watchlist, or to 5 to create a weekly watchlist. Qlarissa
-                will track changes to the security price over this duration when displaying your watchlist!
+                Set this to 1 to create a daily watchlist, or to 5 for a weekly one. Qlarissa will track
+                changes to the security price over this period when displaying your watchlist!
               </TooltipContent>
             </Tooltip>
             <TrackedDurationInput
