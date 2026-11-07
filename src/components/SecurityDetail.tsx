@@ -1495,7 +1495,7 @@ function StarToggle({
       {watchlist && (
         <div className="absolute left-0 top-full z-20 hidden w-64 max-w-[calc(100vw-2rem)] pt-2 group-hover:block">
           <div className="rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <p className="font-semibold text-white">{watchlist.name}</p>
               <Pin
                 size={16}
