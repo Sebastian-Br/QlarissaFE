@@ -37,6 +37,7 @@ import {
   type Security,
   type Stock,
 } from "@/models/Security";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 const typeNames: Record<SecurityType, string> = {
   [SecurityType.Stock]: "Stock",
@@ -1644,10 +1645,25 @@ function CreateWatchlistDialog({
     }
   };
 
-  const kindOptions: { value: WatchlistKind; label: string; disabled: boolean }[] = [
-    { value: "none", label: "Neither", disabled: false },
-    { value: "primary", label: "Primary", disabled: hasPrimary },
-    { value: "secondary", label: "Secondary", disabled: hasSecondary },
+  const kindOptions: {
+    value: WatchlistKind;
+    label: string;
+    disabled: boolean;
+    disabledReason: string;
+  }[] = [
+    { value: "none", label: "Neither", disabled: false, disabledReason: "" },
+    {
+      value: "primary",
+      label: "Primary",
+      disabled: hasPrimary,
+      disabledReason: "A primary watchlist already exists. Only one can exist at a time.",
+    },
+    {
+      value: "secondary",
+      label: "Secondary",
+      disabled: hasSecondary,
+      disabledReason: "A secondary watchlist already exists. Only one can exist at a time.",
+    },
   ];
 
   return (
@@ -1683,33 +1699,44 @@ function CreateWatchlistDialog({
             <legend className="mb-2">Type</legend>
             <div className="flex flex-wrap gap-2">
               {kindOptions.map((option) => (
-                <label
-                  key={option.value}
-                  className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${
-                    option.disabled
-                      ? "cursor-not-allowed border-sky-200/10 text-slate-600"
-                      : kind === option.value
-                        ? "cursor-pointer border-sky-300 bg-sky-400/15 text-sky-200"
-                        : "cursor-pointer border-sky-200/15 text-slate-300 hover:border-sky-300/40"
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="watchlist-kind"
-                    value={option.value}
-                    checked={kind === option.value}
-                    disabled={option.disabled || submitting}
-                    onChange={() => setKind(option.value)}
-                    className="accent-sky-300"
-                  />
-                  {option.label}
-                </label>
+                <Tooltip key={option.value}>
+                  <TooltipTrigger asChild>
+                    <label
+                      className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 transition-colors ${
+                        option.disabled
+                          ? "cursor-not-allowed border-sky-200/10 text-slate-600"
+                          : kind === option.value
+                            ? "cursor-pointer border-sky-300 bg-sky-400/15 text-sky-200"
+                            : "cursor-pointer border-sky-200/15 text-slate-300 hover:border-sky-300/40"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="watchlist-kind"
+                        value={option.value}
+                        checked={kind === option.value}
+                        disabled={option.disabled || submitting}
+                        onChange={() => setKind(option.value)}
+                        className="accent-sky-300"
+                      />
+                      {option.label}
+                    </label>
+                  </TooltipTrigger>
+                  {option.disabled && (
+                    <TooltipContent
+                      side="top"
+                      className="max-w-64 border border-sky-200/15 bg-slate-800 text-slate-100 shadow-xl"
+                    >
+                      {option.disabledReason}
+                    </TooltipContent>
+                  )}
+                </Tooltip>
               ))}
             </div>
           </fieldset>
 
           <div className="flex items-center justify-between gap-3 text-sm text-slate-400">
-            <span>Pin</span>
+            <span>Pin to dashboard</span>
             <button
               type="button"
               aria-label="Pin watchlist"
@@ -1725,7 +1752,20 @@ function CreateWatchlistDialog({
           </div>
 
           <div className="flex items-center justify-between gap-3 text-sm text-slate-400">
-            <span>Tracked change duration (days)</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span className="cursor-help underline decoration-dotted decoration-slate-500 underline-offset-4">
+                  Tracked change duration (days)
+                </span>
+              </TooltipTrigger>
+              <TooltipContent
+                side="top"
+                className="max-w-72 border border-sky-200/15 bg-slate-800 text-slate-100 shadow-xl"
+              >
+                Set this to 1 to create a daily watchlist, or to 5 to create a weekly watchlist. Qlarissa
+                will track changes to the security price over this duration when displaying your watchlist!
+              </TooltipContent>
+            </Tooltip>
             <TrackedDurationInput
               inputRef={durationInputRef}
               defaultValue={1}
