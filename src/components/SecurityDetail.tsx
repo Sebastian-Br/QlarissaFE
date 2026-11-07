@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   HubConnectionBuilder,
   HubConnectionState,
@@ -17,6 +24,8 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getSecurity, updateSecurity } from "@/api/securityApi";
+import { getWatchlistsMinimal } from "@/api/watchlistApi";
+import type { WatchlistMinimal } from "@/models/WatchlistMinimal";
 import {
   SecurityType,
   type DailyPrice,
@@ -1446,29 +1455,81 @@ function StarToggle({
   size,
   pressed,
   onToggle,
+  watchlist,
 }: {
   label: string;
   size: number;
   pressed: boolean;
   onToggle: () => void;
+  watchlist: WatchlistMinimal | undefined;
 }) {
+  const [isCardOpen, setIsCardOpen] = useState(false);
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isCardOpen) return;
+    const handlePointerDown = (event: MouseEvent) => {
+      if (!wrapperRef.current?.contains(event.target as Node)) setIsCardOpen(false);
+    };
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setIsCardOpen(false);
+    };
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isCardOpen]);
+
+  const handleContextMenu = (event: ReactMouseEvent) => {
+    if (!watchlist) return;
+    event.preventDefault();
+    setIsCardOpen((open) => !open);
+  };
+
   return (
-    <button
-      type="button"
-      aria-label={label}
-      aria-pressed={pressed}
-      onClick={onToggle}
-      className={`shrink-0 rounded-full p-1 transition-all duration-200 hover:scale-110 hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95 ${
-        pressed ? "text-sky-300" : "text-slate-500 hover:text-sky-300"
-      }`}
-    >
-      <Star
-        size={size}
-        fill={pressed ? "currentColor" : "none"}
-        strokeWidth={2}
-        aria-hidden="true"
-      />
-    </button>
+    <div ref={wrapperRef} className="relative shrink-0">
+      <button
+        type="button"
+        aria-label={label}
+        aria-pressed={pressed}
+        disabled={!watchlist}
+        onClick={onToggle}
+        onContextMenu={handleContextMenu}
+        className={`rounded-full p-1 transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 disabled:cursor-not-allowed disabled:text-slate-700 enabled:hover:scale-110 enabled:hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] ${
+          pressed ? "text-sky-300" : "text-slate-500 enabled:hover:text-sky-300"
+        }`}
+      >
+        <Star
+          size={size}
+          fill={pressed ? "currentColor" : "none"}
+          strokeWidth={2}
+          aria-hidden="true"
+        />
+      </button>
+      {watchlist && isCardOpen && (
+        <div className="absolute left-0 top-full z-20 mt-2 w-64 max-w-[calc(100vw-2rem)] rounded-xl border border-sky-200/15 bg-slate-900 p-4 text-sm shadow-xl shadow-slate-950/40">
+          <p className="font-semibold text-white">{watchlist.Name}</p>
+          <div className="mt-3 flex items-center justify-between gap-3 text-slate-400">
+            <span>Pinned</span>
+            <Star
+              size={16}
+              className="text-sky-300"
+              fill={watchlist.IsPinned ? "currentColor" : "none"}
+              aria-label={watchlist.IsPinned ? "Pinned" : "Not pinned"}
+              role="img"
+            />
+          </div>
+          <div className="mt-2 flex items-center justify-between gap-3 text-slate-400">
+            <span>Tracked change duration (days)</span>
+            <span className="font-medium text-white">
+              {watchlist.TrackedChangeDurationTradingDays}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -1486,6 +1547,9 @@ export default function SecurityDetail() {
   const [isBusinessSummaryExpanded, setIsBusinessSummaryExpanded] = useState(false);
   const [isStarredLarge, setIsStarredLarge] = useState(false);
   const [isStarredSmall, setIsStarredSmall] = useState(false);
+  const [watchlists, setWatchlists] = useState<WatchlistMinimal[]>([]);
+  const primaryWatchlist = watchlists.find((watchlist) => watchlist.IsPrimary);
+  const secondaryWatchlist = watchlists.find((watchlist) => watchlist.IsSecondary);
   const businessSummaryRef = useRef<HTMLParagraphElement>(null);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1501,6 +1565,7 @@ export default function SecurityDetail() {
     setLiveTimestamp(null);
     setIsBusinessSummaryExpanded(false);
     setError(false);
+    setWatchlists([]);
     getSecurity(securityId, controller.signal)
       .then((loadedSecurity) => {
         setSecurity(loadedSecurity);
@@ -1510,6 +1575,9 @@ export default function SecurityDetail() {
         if (!(cause instanceof DOMException && cause.name === "AbortError"))
           setError(true);
       });
+    getWatchlistsMinimal()
+      .then(setWatchlists)
+      .catch(() => setWatchlists([]));
     return () => controller.abort();
   }, [securityId]);
 
@@ -1736,12 +1804,14 @@ export default function SecurityDetail() {
                     size={28}
                     pressed={isStarredLarge}
                     onToggle={() => setIsStarredLarge((value) => !value)}
+                    watchlist={primaryWatchlist}
                   />
                   <StarToggle
                     label="Star security (secondary)"
                     size={20}
                     pressed={isStarredSmall}
                     onToggle={() => setIsStarredSmall((value) => !value)}
+                    watchlist={secondaryWatchlist}
                   />
                 </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
