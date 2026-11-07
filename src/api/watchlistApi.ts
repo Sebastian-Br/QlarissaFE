@@ -40,7 +40,7 @@ export async function getWatchlistIdsForSecurity(
 export async function watchSecurity(watchlistId: number, securityId: number): Promise<void> {
   const token = localStorage.getItem("jwt");
   const response = await fetch(
-    `${BASE_URL}/api/Watchlist/WatchSecurityAsync?watchlistId=${encodeURIComponent(watchlistId)}&securityId=${encodeURIComponent(securityId)}`,
+    `${BASE_URL}/api/Watchlist/WatchSecurity?watchlistId=${encodeURIComponent(watchlistId)}&securityId=${encodeURIComponent(securityId)}`,
     {
       method: "POST",
       headers: {
@@ -55,7 +55,7 @@ export async function watchSecurity(watchlistId: number, securityId: number): Pr
 export async function unwatchSecurity(watchlistId: number, securityId: number): Promise<void> {
   const token = localStorage.getItem("jwt");
   const response = await fetch(
-    `${BASE_URL}/api/Watchlist/UnwatchSecurityAsync?watchlistId=${encodeURIComponent(watchlistId)}&securityId=${encodeURIComponent(securityId)}`,
+    `${BASE_URL}/api/Watchlist/UnwatchSecurity?watchlistId=${encodeURIComponent(watchlistId)}&securityId=${encodeURIComponent(securityId)}`,
     {
       method: "DELETE",
       headers: {
