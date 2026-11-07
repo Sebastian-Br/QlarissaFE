@@ -13,6 +13,7 @@ import {
   LineChart,
   RefreshCw,
   Settings,
+  Star,
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 import { getSecurity, updateSecurity } from "@/api/securityApi";
@@ -1440,6 +1441,37 @@ function Splits({
   );
 }
 
+function StarToggle({
+  label,
+  size,
+  pressed,
+  onToggle,
+}: {
+  label: string;
+  size: number;
+  pressed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      aria-pressed={pressed}
+      onClick={onToggle}
+      className={`shrink-0 rounded-full p-1 transition-all duration-200 hover:scale-110 hover:drop-shadow-[0_0_6px_rgba(125,211,252,0.7)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-300 active:scale-95 ${
+        pressed ? "text-sky-300" : "text-slate-500 hover:text-sky-300"
+      }`}
+    >
+      <Star
+        size={size}
+        fill={pressed ? "currentColor" : "none"}
+        strokeWidth={2}
+        aria-hidden="true"
+      />
+    </button>
+  );
+}
+
 export default function SecurityDetail() {
   const { id } = useParams();
   const securityId = Number(id);
@@ -1452,6 +1484,8 @@ export default function SecurityDetail() {
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [isBusinessSummaryExpanded, setIsBusinessSummaryExpanded] = useState(false);
+  const [isStarredLarge, setIsStarredLarge] = useState(false);
+  const [isStarredSmall, setIsStarredSmall] = useState(false);
   const businessSummaryRef = useRef<HTMLParagraphElement>(null);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -1693,9 +1727,23 @@ export default function SecurityDetail() {
                     {security.exchangeName || security.exchangeShortName || "—"}
                   </span>
                 </div>
-                <h1 className="mt-4 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                  {security.name}
-                </h1>
+                <div className="mt-4 flex items-center gap-3">
+                  <h1 className="text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                    {security.name}
+                  </h1>
+                  <StarToggle
+                    label="Star security"
+                    size={28}
+                    pressed={isStarredLarge}
+                    onToggle={() => setIsStarredLarge((value) => !value)}
+                  />
+                  <StarToggle
+                    label="Star security (secondary)"
+                    size={20}
+                    pressed={isStarredSmall}
+                    onToggle={() => setIsStarredSmall((value) => !value)}
+                  />
+                </div>
                 <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1">
                   <p className="text-lg text-slate-400">
                     {security.symbol} · {security.shortName}
