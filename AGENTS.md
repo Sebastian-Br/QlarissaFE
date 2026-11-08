@@ -43,3 +43,14 @@ When presented with an endpoint, keep in mind that "Async" suffixes are not part
 * Make the smallest reasonable change needed to complete the task.
 * Preserve existing functionality unless the task explicitly requires changing it.
 * Keep code readable and maintainable.
+
+## Code Organization
+
+* `src/components/SecurityDetail.tsx`: security page. Owns route params, the security load effect, and the update action; composes the modules below.
+* `src/components/security/charts/`: `PriceHistoryChart` (daily prices, log/linear, live-price date), `DividendPayoutChart` (dividend bars). `ChartFrame.tsx` (surface, grid, tick and axis labels), `ChartHover.tsx` (crosshair and hover cards), `ChartSettings.tsx` (settings button and panel) are shared by both.
+* `src/components/security/watchlist/`: star toggles, add-to-watchlist menu, create dialog, tracked-duration input. `WatchlistControls.tsx` composes them from the `useSecurityWatchlists` state.
+* `src/components/security/details/`: `TypeSpecificDetails` dispatches to `StockDetails`, `EtfDetails`, `CryptoDetails`, `CurrencyPairDetails`. `DetailCard`/`Metric` and `DetailList` (`SplitsCard`) are the shared building blocks.
+* `src/components/security/`: `SecurityHeader` (title, badges, watchlist controls, symbol), `BusinessSummary` (expandable text), `PriceSummary` (price, live status, update button), `UpdatingOverlay`.
+* `src/hooks/`: `useChartViewport` (zoom, pan, wheel), `useChartPointer` (hover, drag, click), `useLivePrices` (SignalR subscription and unavailable timer), `useSecurityWatchlists` (watchlist loading, star toggles, saves).
+* `src/lib/formatting.ts`: number, date, and price formatters, and security type labels. `src/lib/livePrices.ts`: live-price type and merge into daily history. `src/lib/chart/`: `plot.ts` (chart coordinate space and hover anchors) and `timeAxis.ts` (calendar scale, year and month ticks, label collision rules).
+* Pure calculations belong in `src/lib`, stateful behavior in `src/hooks`, and markup in components.
