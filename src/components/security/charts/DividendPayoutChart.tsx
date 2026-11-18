@@ -95,8 +95,8 @@ export function DividendPayoutChart({
   const useLogScale = logScale && positiveAmounts.length > 0;
   const minValue = amounts.length ? Math.min(...amounts) : 0;
   const maxValue = amounts.length ? Math.max(...amounts) : 0;
-  const min = useLogScale ? Math.log10(Math.min(...positiveAmounts)) : 0;
-  const max = useLogScale ? Math.log10(Math.max(...positiveAmounts)) : maxValue;
+  const min = useLogScale ? Math.log(Math.min(...positiveAmounts)) : 0;
+  const max = useLogScale ? Math.log(Math.max(...positiveAmounts)) : maxValue;
   const range = max - min || 1;
   const { calendarStart, calendarRange, axisWidth, xForDate, yearTicks, tickLabels, showTimeHoverCard } =
     createTimeAxis({
@@ -108,14 +108,14 @@ export function DividendPayoutChart({
   const yForAmount = (amount: number) => {
     const value = useLogScale
       ? amount > 0
-        ? Math.log10(amount)
+        ? Math.log(amount)
         : min
       : amount;
     return PLOT.top + ((max - value) / range) * PLOT.height;
   };
   const yTicks = useLogScale
     ? [0, 0.33, 0.66, 1].map((ratio, index) => {
-        const rawValue = 10 ** (min + (max - min) * ratio);
+        const rawValue = Math.exp(min + (max - min) * ratio);
         const value = index === 0 ? minValue : Math.max(0, rawValue);
         return {
           ratio,
