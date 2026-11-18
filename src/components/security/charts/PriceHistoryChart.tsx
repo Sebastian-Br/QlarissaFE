@@ -113,8 +113,8 @@ export function PriceHistoryChart({
     logScale && values.length > 0 && values.every((value) => value > 0);
   const minValue = values.length ? Math.min(...values) : 1;
   const maxValue = values.length ? Math.max(...values) : 1;
-  const min = canUseLog ? Math.log10(minValue) : 0;
-  const max = canUseLog ? Math.log10(maxValue) : maxValue;
+  const min = canUseLog ? Math.log(minValue) : 0;
+  const max = canUseLog ? Math.log(maxValue) : maxValue;
   const range = max - min || 1;
   const { calendarStart, calendarRange, axisWidth, xForDate, yearTicks, tickLabels, showTimeHoverCard } =
     createTimeAxis({
@@ -129,7 +129,7 @@ export function PriceHistoryChart({
   };
   const y = (value: number) =>
     PLOT.top +
-    ((max - (canUseLog ? Math.log10(value) : value)) / range) * PLOT.height;
+    ((max - (canUseLog ? Math.log(value) : value)) / range) * PLOT.height;
   const path = visibleHistory
     .map(
       (point, index) =>
@@ -138,7 +138,7 @@ export function PriceHistoryChart({
     .join(" ");
   const yTicks = canUseLog
     ? [0, 0.33, 0.66, 1].map((ratio, index) => {
-        const rawValue = 10 ** (min + (max - min) * ratio);
+        const rawValue = Math.exp(min + (max - min) * ratio);
         const value =
           index === 0 ? minValue : Math.max(1, Math.round(rawValue));
         return {
@@ -174,7 +174,7 @@ export function PriceHistoryChart({
         visibleHistory[Math.max(0, Math.min(visibleHistory.length - 1, index))];
       if (!point) return null;
       const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
-      const value = canUseLog ? Math.log10(point.average) : point.average;
+      const value = canUseLog ? Math.log(point.average) : point.average;
       const pointY = PLOT.top + ((max - value) / range) * PLOT.height;
       const distance = Math.hypot(
         (chartX - pointX) / 89,
