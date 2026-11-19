@@ -8,7 +8,11 @@ import {
   clientToPlotY,
   hoverAnchor,
 } from "@/lib/chart/plot";
-import { createTimeAxis, dateToPlotX } from "@/lib/chart/timeAxis";
+import {
+  createTimeAxis,
+  dateToPlotX,
+  nearestDateIndex,
+} from "@/lib/chart/timeAxis";
 import {
   axisNumberFormatter,
   formatDate,
@@ -167,12 +171,16 @@ export function PriceHistoryChart({
       if (!box) return null;
       const chartX = clientToPlotX(box, clientX);
       const chartY = clientToPlotY(box, clientY);
-      const index = Math.round(
-        ((chartX - PLOT.left) / PLOT.width) * (visibleHistory.length - 1),
-      );
+      if (!visibleHistory.length) return null;
+      const hoveredTimestamp =
+        calendarStart + ((chartX - PLOT.left) / PLOT.width) * calendarRange;
       const point =
-        visibleHistory[Math.max(0, Math.min(visibleHistory.length - 1, index))];
-      if (!point) return null;
+        visibleHistory[
+          nearestDateIndex(
+            visibleHistory.map((item) => item.date),
+            hoveredTimestamp,
+          )
+        ];
       const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
       const value = canUseLog ? Math.log(point.average) : point.average;
       const pointY = PLOT.top + ((max - value) / range) * PLOT.height;

@@ -9,18 +9,30 @@ export const PLOT = {
 };
 
 const SURFACE_PADDING_PX = 12;
+const SURFACE_BORDER_PX = 1;
+const SURFACE_INSET_PX = SURFACE_PADDING_PX + SURFACE_BORDER_PX;
 
 export function clientToPlotX(box: DOMRect, clientX: number) {
   return Math.max(
     PLOT.left,
-    Math.min(PLOT.right, ((clientX - box.left) / box.width) * 100),
+    Math.min(
+      PLOT.right,
+      ((clientX - box.left - SURFACE_INSET_PX) /
+        (box.width - SURFACE_INSET_PX * 2)) *
+        100,
+    ),
   );
 }
 
 export function clientToPlotY(box: DOMRect, clientY: number) {
   return Math.max(
     PLOT.top,
-    Math.min(PLOT.bottom, ((clientY - box.top) / box.height) * 100),
+    Math.min(
+      PLOT.bottom,
+      ((clientY - box.top - SURFACE_INSET_PX) /
+        (box.height - SURFACE_INSET_PX * 2)) *
+        100,
+    ),
   );
 }
 

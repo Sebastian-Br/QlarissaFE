@@ -30,6 +30,21 @@ export function dateToPlotX(
   );
 }
 
+export function nearestDateIndex(dates: string[], timestamp: number) {
+  const timeAt = (index: number) =>
+    Date.parse(`${dates[index].slice(0, 10)}T00:00:00Z`);
+  let low = 0;
+  let high = dates.length - 1;
+  while (low < high) {
+    const mid = (low + high) >> 1;
+    if (timeAt(mid) < timestamp) low = mid + 1;
+    else high = mid;
+  }
+  return low > 0 && timestamp - timeAt(low - 1) <= timeAt(low) - timestamp
+    ? low - 1
+    : low;
+}
+
 export function createTimeAxis({
   firstDate,
   lastDate,
