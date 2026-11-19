@@ -8,6 +8,7 @@ import {
   type RefObject,
   type SetStateAction,
 } from "react";
+import { clientToPlotX, PLOT } from "@/lib/chart/plot";
 
 export interface ChartViewportControls {
   pan: number;
@@ -20,9 +21,11 @@ export interface ChartViewportControls {
 export function useChartViewport<T>({
   items,
   chartRef,
+  indexAtPlotX,
 }: {
   items: T[];
   chartRef: RefObject<HTMLDivElement | null>;
+  indexAtPlotX?: (plotX: number, visibleItems: T[]) => number;
 }): ChartViewportControls & { visibleItems: T[] } {
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState(0);
@@ -50,22 +53,35 @@ export function useChartViewport<T>({
         Math.max(2, Math.ceil(items.length / nextZoom)),
       );
       const box = chartRef.current?.getBoundingClientRect();
-      const pointerRatio = box
-        ? Math.max(0, Math.min(1, (event.clientX - box.left) / box.width))
-        : 0.5;
-      const currentIndex =
-        windowStart + Math.round(pointerRatio * Math.max(0, pointCount - 1));
+      const plotX = box
+        ? clientToPlotX(box, event.clientX)
+        : PLOT.left + PLOT.width / 2;
+      const localIndex = indexAtPlotX
+        ? indexAtPlotX(plotX, visibleItems)
+        : Math.round(
+            ((plotX - PLOT.left) / PLOT.width) * Math.max(0, pointCount - 1),
+          );
+      const anchorRatio = localIndex / Math.max(1, pointCount - 1);
+      const anchorIndex = windowStart + localIndex;
       const nextStart = Math.max(
         0,
         Math.min(
           items.length - nextCount,
-          Math.round(currentIndex - pointerRatio * (nextCount - 1)),
+          Math.round(anchorIndex - anchorRatio * (nextCount - 1)),
         ),
       );
       setZoom(nextZoom);
       setPan(items.length - nextCount - nextStart);
     },
-    [chartRef, items.length, pointCount, windowStart, zoom],
+    [
+      chartRef,
+      indexAtPlotX,
+      items.length,
+      pointCount,
+      visibleItems,
+      windowStart,
+      zoom,
+    ],
   );
 
   useEffect(() => {

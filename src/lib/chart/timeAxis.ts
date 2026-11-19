@@ -30,11 +30,17 @@ export function dateToPlotX(
   );
 }
 
-export function nearestDateIndex(dates: string[], timestamp: number) {
+export function nearestDateIndexAtPlotX<T extends { date: string }>(
+  items: T[],
+  plotX: number,
+) {
   const timeAt = (index: number) =>
-    Date.parse(`${dates[index].slice(0, 10)}T00:00:00Z`);
+    Date.parse(`${items[index].date.slice(0, 10)}T00:00:00Z`);
+  const start = timeAt(0);
+  const range = Math.max(1, timeAt(items.length - 1) - start);
+  const timestamp = start + ((plotX - PLOT.left) / PLOT.width) * range;
   let low = 0;
-  let high = dates.length - 1;
+  let high = items.length - 1;
   while (low < high) {
     const mid = (low + high) >> 1;
     if (timeAt(mid) < timestamp) low = mid + 1;

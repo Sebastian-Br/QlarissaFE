@@ -11,7 +11,7 @@ import {
 import {
   createTimeAxis,
   dateToPlotX,
-  nearestDateIndex,
+  nearestDateIndexAtPlotX,
 } from "@/lib/chart/timeAxis";
 import {
   axisNumberFormatter,
@@ -92,7 +92,16 @@ export function PriceHistoryChart({
       ),
     [endDate, history, startDate],
   );
-  const viewport = useChartViewport({ items: filteredHistory, chartRef });
+  const indexAtPlotX = useCallback(
+    (plotX: number, items: DailyPrice[]) =>
+      nearestDateIndexAtPlotX(items, plotX),
+    [],
+  );
+  const viewport = useChartViewport({
+    items: filteredHistory,
+    chartRef,
+    indexAtPlotX,
+  });
   const { visibleItems: visibleHistory, setPan } = viewport;
 
   useEffect(() => {
@@ -172,15 +181,8 @@ export function PriceHistoryChart({
       const chartX = clientToPlotX(box, clientX);
       const chartY = clientToPlotY(box, clientY);
       if (!visibleHistory.length) return null;
-      const hoveredTimestamp =
-        calendarStart + ((chartX - PLOT.left) / PLOT.width) * calendarRange;
       const point =
-        visibleHistory[
-          nearestDateIndex(
-            visibleHistory.map((item) => item.date),
-            hoveredTimestamp,
-          )
-        ];
+        visibleHistory[nearestDateIndexAtPlotX(visibleHistory, chartX)];
       const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
       const value = canUseLog ? Math.log(point.average) : point.average;
       const pointY = PLOT.top + ((max - value) / range) * PLOT.height;
