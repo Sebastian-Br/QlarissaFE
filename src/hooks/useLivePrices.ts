@@ -14,6 +14,28 @@ import type { DailyPrice, Security } from "@/models/Security";
 
 const UNAVAILABLE_AFTER_MS = 30_000;
 
+function getUsableJwt() {
+  const token = localStorage.getItem("jwt");
+  if (!token) return null;
+
+  try {
+    const payload = token.split(".")[1];
+    if (!payload) return null;
+
+    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const bytes = Uint8Array.from(
+      atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")),
+      (character) => character.charCodeAt(0),
+    );
+    const claims: { exp?: unknown } = JSON.parse(new TextDecoder().decode(bytes));
+    return typeof claims.exp !== "number" || claims.exp > Date.now() / 1000
+      ? token
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 export function useLivePrices({
   security,
   securityId,
@@ -37,9 +59,11 @@ export function useLivePrices({
     if (!security) return;
 
     const symbol = security.symbol;
+    const symbols = [symbol];
     const normalizedSymbol = symbol.toUpperCase();
     let disposed = false;
     let connection: HubConnection | null = null;
+    setLiveUpdatesUnavailable(false);
 
     const startUnavailableTimer = () => {
       if (unavailableTimerRef.current) clearTimeout(unavailableTimerRef.current);
@@ -68,8 +92,7 @@ export function useLivePrices({
     };
 
     const handleSnapshot = (updates: LivePrice[]) => {
-      const update = updates[0];
-      if (update) applyLivePrice(update);
+      updates.forEach(applyLivePrice);
     };
     const handleBatch = (updates: LivePrice[]) => {
       const update = updates.find(
@@ -77,16 +100,35 @@ export function useLivePrices({
       );
       if (update) applyLivePrice(update);
     };
-    const subscribe = async () => {
-      if (connection?.state === HubConnectionState.Connected) {
-        await connection.invoke("Subscribe", [symbol]);
-      }
+    const reportConnectionError = (action: string, cause: unknown) => {
+      if (disposed) return;
+      setLiveUpdatesUnavailable(true);
+      console.warn(`Live-price ${action} failed.`, cause);
     };
+    const subscribe = async () => {
+      if (disposed || connection?.state !== HubConnectionState.Connected) return;
+      const snapshot = await connection.invoke<LivePrice[] | null>(
+        "Subscribe",
+        symbols,
+      );
+      if (snapshot) handleSnapshot(snapshot);
+    };
+
+    if (!getUsableJwt()) {
+      setLiveUpdatesUnavailable(true);
+      return () => {
+        disposed = true;
+      };
+    }
 
     startUnavailableTimer();
     connection = new HubConnectionBuilder()
       .withUrl(`${import.meta.env.VITE_API_BASE_URL}/hubs/live-prices`, {
-        accessTokenFactory: () => localStorage.getItem("jwt") ?? "",
+        accessTokenFactory: () => {
+          const token = getUsableJwt();
+          if (!token) throw new Error("A valid sign-in token is required.");
+          return token;
+        },
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)
@@ -94,12 +136,26 @@ export function useLivePrices({
     connection.on("PriceSnapshot", handleSnapshot);
     connection.on("PriceBatch", handleBatch);
     connection.onreconnected(() => {
-      void subscribe().catch(() => undefined);
+      void subscribe().catch((cause) =>
+        reportConnectionError("resubscription", cause),
+      );
     });
-    void connection
-      .start()
-      .then(subscribe)
-      .catch(() => undefined);
+    connection.onreconnecting((cause) => {
+      if (cause) reportConnectionError("reconnection", cause);
+      else if (!disposed) setLiveUpdatesUnavailable(true);
+    });
+    connection.onclose((cause) => {
+      if (cause) reportConnectionError("connection", cause);
+      else if (!disposed) setLiveUpdatesUnavailable(true);
+    });
+    void (async () => {
+      try {
+        await connection?.start();
+        await subscribe();
+      } catch (cause) {
+        reportConnectionError("connection", cause);
+      }
+    })();
 
     return () => {
       disposed = true;
@@ -107,10 +163,19 @@ export function useLivePrices({
       connection?.off("PriceSnapshot", handleSnapshot);
       connection?.off("PriceBatch", handleBatch);
       void (async () => {
-        if (connection?.state === HubConnectionState.Connected) {
-          await connection.invoke("Unsubscribe", [symbol]).catch(() => undefined);
+        try {
+          if (connection?.state === HubConnectionState.Connected) {
+            await connection.invoke("Unsubscribe", symbols);
+          }
+        } catch (cause) {
+          console.warn("Live-price unsubscription failed.", cause);
+        } finally {
+          try {
+            await connection?.stop();
+          } catch (cause) {
+            console.warn("Live-price connection cleanup failed.", cause);
+          }
         }
-        await connection?.stop();
       })();
     };
   }, [security, setGraphHistory]);
