@@ -8,6 +8,7 @@ import {
   clientToPlotY,
   hoverAnchor,
   hoverTriggerPath,
+  isInsidePlot,
 } from "@/lib/chart/plot";
 import {
   createTimeAxis,
@@ -179,12 +180,10 @@ export function PriceHistoryChart({
   const getHover = useCallback(
     (clientX: number, clientY: number): PriceHover | null => {
       const box = chartRef.current?.getBoundingClientRect();
-      if (!box || !visibleHistory.length) return null;
       if (
-        clientX < box.left ||
-        clientX > box.right ||
-        clientY < box.top ||
-        clientY > box.bottom
+        !box ||
+        !visibleHistory.length ||
+        !isInsidePlot(box, clientX, clientY)
       )
         return null;
       const chartX = clientToPlotX(box, clientX);

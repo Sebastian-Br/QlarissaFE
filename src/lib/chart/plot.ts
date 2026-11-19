@@ -24,6 +24,23 @@ export function clientToPlotX(box: DOMRect, clientX: number) {
   );
 }
 
+export function isInsidePlot(box: DOMRect, clientX: number, clientY: number) {
+  const plotX =
+    ((clientX - box.left - SURFACE_INSET_PX) /
+      (box.width - SURFACE_INSET_PX * 2)) *
+    100;
+  const plotY =
+    ((clientY - box.top - SURFACE_INSET_PX) /
+      (box.height - SURFACE_INSET_PX * 2)) *
+    100;
+  return (
+    plotX >= PLOT.left &&
+    plotX <= PLOT.right &&
+    plotY >= PLOT.top &&
+    plotY <= PLOT.bottom
+  );
+}
+
 export function clientToPlotY(box: DOMRect, clientY: number) {
   return Math.max(
     PLOT.top,
