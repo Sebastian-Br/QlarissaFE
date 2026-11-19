@@ -36,6 +36,23 @@ export function clientToPlotY(box: DOMRect, clientY: number) {
   );
 }
 
+export function hoverTriggerPath(
+  points: { x: number; y: number }[],
+  verticalDistance: number,
+) {
+  return points
+    .map((point, index) => {
+      const previous = points[index - 1];
+      const next = points[index + 1];
+      const left = previous ? (previous.x + point.x) / 2 : PLOT.left;
+      const right = next ? (point.x + next.x) / 2 : PLOT.right;
+      const top = Math.max(PLOT.top, point.y - verticalDistance);
+      const bottom = Math.min(PLOT.bottom, point.y + verticalDistance);
+      return `M ${left} ${top} H ${right} V ${bottom} H ${left} Z`;
+    })
+    .join(" ");
+}
+
 export function hoverAnchor(
   box: Pick<DOMRect, "width" | "height">,
   pointX: number,

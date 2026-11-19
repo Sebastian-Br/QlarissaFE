@@ -7,6 +7,7 @@ import {
   clientToPlotX,
   clientToPlotY,
   hoverAnchor,
+  hoverTriggerPath,
 } from "@/lib/chart/plot";
 import {
   createTimeAxis,
@@ -68,6 +69,7 @@ export function PriceHistoryChart({
   const [endDate, setEndDate] = useState(history.at(-1)?.date ?? "");
   const [logScale, setLogScale] = useState(true);
   const [cardDistance, setCardDistance] = useState(20);
+  const [hoverDistance, setHoverDistance] = useState(5);
   const [showSettings, setShowSettings] = useState(false);
   const [selected, setSelected] = useState<PriceHover | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
@@ -177,24 +179,34 @@ export function PriceHistoryChart({
   const getHover = useCallback(
     (clientX: number, clientY: number): PriceHover | null => {
       const box = chartRef.current?.getBoundingClientRect();
-      if (!box) return null;
+      if (!box || !visibleHistory.length) return null;
+      if (
+        clientX < box.left ||
+        clientX > box.right ||
+        clientY < box.top ||
+        clientY > box.bottom
+      )
+        return null;
       const chartX = clientToPlotX(box, clientX);
       const chartY = clientToPlotY(box, clientY);
-      if (!visibleHistory.length) return null;
       const point =
         visibleHistory[nearestDateIndexAtPlotX(visibleHistory, chartX)];
       const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
       const value = canUseLog ? Math.log(point.average) : point.average;
       const pointY = PLOT.top + ((max - value) / range) * PLOT.height;
-      const distance = Math.hypot(
-        (chartX - pointX) / 89,
-        (chartY - pointY) / PLOT.height,
-      );
-      return distance <= 0.06
+      return Math.abs(chartY - pointY) <= hoverDistance
         ? { point, ...hoverAnchor(box, pointX, pointY) }
         : null;
     },
-    [calendarRange, calendarStart, canUseLog, max, range, visibleHistory],
+    [
+      calendarRange,
+      calendarStart,
+      canUseLog,
+      hoverDistance,
+      max,
+      range,
+      visibleHistory,
+    ],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({
@@ -249,7 +261,23 @@ export function PriceHistoryChart({
               }}
               onCardDistanceChange={setCardDistance}
               onLogScaleToggle={() => setLogScale((current) => !current)}
-            />
+            >
+              <label className="grid gap-1 text-xs font-medium text-slate-400">
+                Hover vertical distance ({hoverDistance}%)
+                <input
+                  aria-label="Hover vertical distance"
+                  type="range"
+                  min="1"
+                  max="50"
+                  step="1"
+                  value={hoverDistance}
+                  onChange={(event) =>
+                    setHoverDistance(Number(event.target.value))
+                  }
+                  className="h-2 cursor-pointer accent-sky-400"
+                />
+              </label>
+            </ChartSettingsPanel>
           )}
           <svg
             viewBox="0 0 100 100"
@@ -267,6 +295,19 @@ export function PriceHistoryChart({
               vectorEffect="non-scaling-stroke"
             />
             <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
+            {showSettings && (
+              <path
+                d={hoverTriggerPath(
+                  visibleHistory.map((point, index) => ({
+                    x: x(index),
+                    y: y(point.average),
+                  })),
+                  hoverDistance,
+                )}
+                fill="#22c55e"
+                fillOpacity="0.25"
+              />
+            )}
             {selected &&
               visibleHistory.some(
                 (point) => point.id === selected.point.id,
