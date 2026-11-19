@@ -177,6 +177,34 @@ export function PriceHistoryChart({
         };
       });
 
+  const triggerPath = useMemo(
+    () =>
+      showSettings
+        ? hoverTriggerPath(
+            visibleHistory.map((point) => ({
+              x: dateToPlotX(point.date, calendarStart, calendarRange),
+              y:
+                PLOT.top +
+                ((max -
+                  (canUseLog ? Math.log(point.average) : point.average)) /
+                  range) *
+                  PLOT.height,
+            })),
+            hoverDistance,
+          )
+        : "",
+    [
+      calendarRange,
+      calendarStart,
+      canUseLog,
+      hoverDistance,
+      max,
+      range,
+      showSettings,
+      visibleHistory,
+    ],
+  );
+
   const getHover = useCallback(
     (clientX: number, clientY: number): PriceHover | null => {
       const box = chartRef.current?.getBoundingClientRect();
@@ -295,17 +323,7 @@ export function PriceHistoryChart({
             />
             <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
             {showSettings && (
-              <path
-                d={hoverTriggerPath(
-                  visibleHistory.map((point, index) => ({
-                    x: x(index),
-                    y: y(point.average),
-                  })),
-                  hoverDistance,
-                )}
-                fill="#22c55e"
-                fillOpacity="0.25"
-              />
+              <path d={triggerPath} fill="#22c55e" fillOpacity="0.25" />
             )}
             {selected &&
               visibleHistory.some(
