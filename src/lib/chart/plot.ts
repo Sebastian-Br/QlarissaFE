@@ -97,13 +97,13 @@ export function hoverAnchor(
   pointY: number,
 ) {
   return {
-    x: SURFACE_PADDING_PX + ((box.width - SURFACE_PADDING_PX * 2) * pointX) / 100,
-    y: SURFACE_PADDING_PX + ((box.height - SURFACE_PADDING_PX * 2) * pointY) / 100,
+    x: SURFACE_INSET_PX + ((box.width - SURFACE_INSET_PX * 2) * pointX) / 100,
+    y: SURFACE_INSET_PX + ((box.height - SURFACE_INSET_PX * 2) * pointY) / 100,
     axisX:
-      SURFACE_PADDING_PX +
-      ((box.width - SURFACE_PADDING_PX * 2) * PLOT.left) / 100,
+      SURFACE_INSET_PX +
+      ((box.width - SURFACE_INSET_PX * 2) * PLOT.left) / 100,
     axisY:
-      SURFACE_PADDING_PX +
-      ((box.height - SURFACE_PADDING_PX * 2) * PLOT.bottom) / 100,
+      SURFACE_INSET_PX +
+      ((box.height - SURFACE_INSET_PX * 2) * PLOT.bottom) / 100,
   };
 }

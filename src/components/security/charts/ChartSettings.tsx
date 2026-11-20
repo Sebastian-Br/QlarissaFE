@@ -15,6 +15,7 @@ export function ChartSettingsButton({
       type="button"
       aria-label={label}
       aria-expanded={expanded}
+      data-chart-overlay=""
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
@@ -63,6 +64,7 @@ export function ChartSettingsPanel({
 }) {
   return (
     <div
+      data-chart-overlay=""
       onPointerDown={(event) => event.stopPropagation()}
       className="absolute right-4 top-14 z-50 grid w-56 gap-3 rounded-xl border border-sky-200/20 bg-[#08243d]/95 p-4 shadow-2xl"
     >

@@ -1,4 +1,12 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  memo,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type PointerEvent,
+} from "react";
 import { Info } from "lucide-react";
 import { useChartPointer } from "@/hooks/useChartPointer";
 import { useChartViewport } from "@/hooks/useChartViewport";
@@ -61,6 +69,9 @@ interface PlotPoint {
 }
 
 type TimeAxis = ReturnType<typeof createTimeAxis>;
+
+const isChartOverlay = (target: EventTarget) =>
+  target instanceof Element && target.closest("[data-chart-overlay]") !== null;
 
 const PriceSeries = memo(function PriceSeries({
   name,
@@ -315,6 +326,18 @@ export function PriceHistoryChart({
       setHovered(getHover(pointerPosition.x, pointerPosition.y));
   }, [getHover, setHovered, viewport.pointerPositionRef]);
 
+  const surfaceHandlers = {
+    ...pointerHandlers,
+    onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
+      if (isChartOverlay(event.target)) {
+        viewport.pointerPositionRef.current = null;
+        setHovered(null);
+        return;
+      }
+      pointerHandlers.onPointerMove(event);
+    },
+  };
+
   const hoveredDateKey = hovered?.point.date;
   const hoveredDate = useMemo(
     () => (hoveredDateKey ? new Date(`${hoveredDateKey}T00:00:00Z`) : null),
@@ -335,7 +358,7 @@ export function PriceHistoryChart({
   return (
     <section>
       {visibleHistory.length > 1 ? (
-        <ChartSurface chartRef={chartRef} handlers={pointerHandlers}>
+        <ChartSurface chartRef={chartRef} handlers={surfaceHandlers}>
           <ChartSettingsButton
             label="Toggle chart settings"
             expanded={showSettings}
