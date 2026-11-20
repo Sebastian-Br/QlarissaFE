@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { LineChart, Settings } from "lucide-react";
 
 export function ChartSettingsButton({
@@ -14,6 +15,7 @@ export function ChartSettingsButton({
       type="button"
       aria-label={label}
       aria-expanded={expanded}
+      data-chart-overlay=""
       onPointerDown={(event) => event.stopPropagation()}
       onClick={(event) => {
         event.stopPropagation();
@@ -45,6 +47,7 @@ export function ChartSettingsPanel({
   onEndDateChange,
   onCardDistanceChange,
   onLogScaleToggle,
+  children,
 }: {
   labels: ChartSettingsLabels;
   startDate: string;
@@ -57,9 +60,11 @@ export function ChartSettingsPanel({
   onEndDateChange: (value: string) => void;
   onCardDistanceChange: (value: number) => void;
   onLogScaleToggle: () => void;
+  children?: ReactNode;
 }) {
   return (
     <div
+      data-chart-overlay=""
       onPointerDown={(event) => event.stopPropagation()}
       className="absolute right-4 top-14 z-50 grid w-56 gap-3 rounded-xl border border-sky-200/20 bg-[#08243d]/95 p-4 shadow-2xl"
     >
@@ -100,6 +105,7 @@ export function ChartSettingsPanel({
           className="h-2 cursor-pointer accent-sky-400"
         />
       </label>
+      {children}
       <button
         type="button"
         aria-label={labels.logScale}

@@ -9,19 +9,86 @@ export const PLOT = {
 };
 
 const SURFACE_PADDING_PX = 12;
+const SURFACE_BORDER_PX = 1;
+const SURFACE_INSET_PX = SURFACE_PADDING_PX + SURFACE_BORDER_PX;
 
 export function clientToPlotX(box: DOMRect, clientX: number) {
   return Math.max(
     PLOT.left,
-    Math.min(PLOT.right, ((clientX - box.left) / box.width) * 100),
+    Math.min(
+      PLOT.right,
+      ((clientX - box.left - SURFACE_INSET_PX) /
+        (box.width - SURFACE_INSET_PX * 2)) *
+        100,
+    ),
+  );
+}
+
+export function isInsidePlot(box: DOMRect, clientX: number, clientY: number) {
+  const plotX =
+    ((clientX - box.left - SURFACE_INSET_PX) /
+      (box.width - SURFACE_INSET_PX * 2)) *
+    100;
+  const plotY =
+    ((clientY - box.top - SURFACE_INSET_PX) /
+      (box.height - SURFACE_INSET_PX * 2)) *
+    100;
+  return (
+    plotX >= PLOT.left &&
+    plotX <= PLOT.right &&
+    plotY >= PLOT.top &&
+    plotY <= PLOT.bottom
   );
 }
 
 export function clientToPlotY(box: DOMRect, clientY: number) {
   return Math.max(
     PLOT.top,
-    Math.min(PLOT.bottom, ((clientY - box.top) / box.height) * 100),
+    Math.min(
+      PLOT.bottom,
+      ((clientY - box.top - SURFACE_INSET_PX) /
+        (box.height - SURFACE_INSET_PX * 2)) *
+        100,
+    ),
   );
+}
+
+export function hoverBasePath(
+  points: { x: number; y: number }[],
+  verticalDistance: number,
+) {
+  if (!points.length) return "";
+  const regions = points.map((point, index) => ({
+    left: index === 0 ? PLOT.left : (points[index - 1].x + point.x) / 2,
+    right:
+      index === points.length - 1
+        ? PLOT.right
+        : (point.x + points[index + 1].x) / 2,
+    top: Math.max(PLOT.top, point.y - verticalDistance),
+    bottom: Math.min(PLOT.bottom, point.y + verticalDistance),
+  }));
+  return regions
+    .map(
+      (region) =>
+        `M ${region.left} ${region.top} H ${region.right} V ${region.bottom} H ${region.left} Z`,
+    )
+    .join(" ");
+}
+
+export function hoverBandPath(
+  points: { x: number; y: number }[],
+  horizontalReach: number,
+  verticalDistance: number,
+) {
+  return points
+    .map((point) => {
+      const left = Math.max(PLOT.left, point.x - horizontalReach);
+      const right = Math.min(PLOT.right, point.x + horizontalReach);
+      const top = Math.max(PLOT.top, point.y - verticalDistance);
+      const bottom = Math.min(PLOT.bottom, point.y + verticalDistance);
+      return `M ${left} ${top} H ${right} V ${bottom} H ${left} Z`;
+    })
+    .join(" ");
 }
 
 export function hoverAnchor(
@@ -30,13 +97,13 @@ export function hoverAnchor(
   pointY: number,
 ) {
   return {
-    x: SURFACE_PADDING_PX + ((box.width - SURFACE_PADDING_PX * 2) * pointX) / 100,
-    y: SURFACE_PADDING_PX + ((box.height - SURFACE_PADDING_PX * 2) * pointY) / 100,
+    x: SURFACE_INSET_PX + ((box.width - SURFACE_INSET_PX * 2) * pointX) / 100,
+    y: SURFACE_INSET_PX + ((box.height - SURFACE_INSET_PX * 2) * pointY) / 100,
     axisX:
-      SURFACE_PADDING_PX +
-      ((box.width - SURFACE_PADDING_PX * 2) * PLOT.left) / 100,
+      SURFACE_INSET_PX +
+      ((box.width - SURFACE_INSET_PX * 2) * PLOT.left) / 100,
     axisY:
-      SURFACE_PADDING_PX +
-      ((box.height - SURFACE_PADDING_PX * 2) * PLOT.bottom) / 100,
+      SURFACE_INSET_PX +
+      ((box.height - SURFACE_INSET_PX * 2) * PLOT.bottom) / 100,
   };
 }
