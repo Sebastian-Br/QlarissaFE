@@ -55,44 +55,86 @@ export function clientToPlotY(box: DOMRect, clientY: number) {
 
 export function hoverTriggerPath(
   points: { x: number; y: number }[],
-  horizontalReach: number,
+  _horizontalReach: number,
+  verticalDistance: number,
+) {
+  return movingAverageHoverPath(points, verticalDistance);
+}
+
+export function movingAverageHoverPath(
+  points: ({ x: number; y: number } & { date?: string })[],
   verticalDistance: number,
 ) {
   if (!points.length) return "";
+  const averagePoints = movingAveragePoints(points);
+  if (!averagePoints.length) return "";
 
-  let path = "";
-  for (let index = 0; index < points.length; index++) {
-    const point = points[index];
-    const left =
-      index === 0
-        ? PLOT.left
-        : (points[index - 1].x + point.x) / 2;
-    const right =
-      index === points.length - 1
-        ? PLOT.right
-        : (point.x + points[index + 1].x) / 2;
-    const top = Math.max(PLOT.top, point.y - verticalDistance);
-    const bottom = Math.min(PLOT.bottom, point.y + verticalDistance);
-    path += `M ${left} ${top} H ${right} V ${bottom} H ${left} Z `;
+  const upper = averagePoints
+    .map((point) => ({
+      x: point.x,
+      y: Math.max(PLOT.top, point.y - verticalDistance),
+    }));
+  const lower = averagePoints
+    .map((point) => ({
+      x: point.x,
+      y: Math.min(PLOT.bottom, point.y + verticalDistance),
+    }));
 
-    if (horizontalReach > 0) {
-      const bandLeft = Math.max(PLOT.left, point.x - horizontalReach);
-      const bandRight = Math.min(PLOT.right, point.x + horizontalReach);
-      path += `M ${bandLeft} ${top} H ${bandRight} V ${bottom} H ${bandLeft} Z `;
-    }
+  let path = `M ${upper[0].x} ${upper[0].y}`;
+  for (let index = 1; index < upper.length; index++) {
+    path += ` L ${upper[index].x} ${upper[index].y}`;
   }
-  return path.trim();
+  for (let index = lower.length - 1; index >= 0; index--) {
+    path += ` L ${lower[index].x} ${lower[index].y}`;
+  }
+  return `${path} Z`;
 }
 
 export function fullPlotHoverPath() {
   return `M ${PLOT.left} ${PLOT.top} H ${PLOT.right} V ${PLOT.bottom} H ${PLOT.left} Z`;
 }
 
+function movingAveragePoints(
+  points: ({ x: number; y: number } & { date?: string })[],
+) {
+  if (!points.length) return [];
+
+  const averages: { x: number; y: number }[] = [];
+  let windowStart = 0;
+  let sum = 0;
+
+  for (let index = 0; index < points.length; index++) {
+    const currentDate = points[index].date
+      ? Date.parse(`${points[index].date!.slice(0, 10)}T00:00:00Z`)
+      : index;
+    sum += points[index].y;
+
+    while (windowStart < index) {
+      const startDate = points[windowStart].date
+        ? Date.parse(`${points[windowStart].date!.slice(0, 10)}T00:00:00Z`)
+        : windowStart;
+      const isOutsideWindow =
+        points[index].date && points[windowStart].date
+          ? currentDate - startDate > 29 * 86_400_000
+          : index - windowStart >= 30;
+      if (!isOutsideWindow) break;
+      sum -= points[windowStart].y;
+      windowStart++;
+    }
+
+    averages.push({
+      x: points[index].x,
+      y: sum / (index - windowStart + 1),
+    });
+  }
+  return averages;
+}
+
 export function findHoveredPlotIndex(
   points: { x: number; y: number }[],
   plotX: number,
   plotY: number,
-  horizontalReach: number,
+  _horizontalReach: number,
   verticalDistance: number,
   alwaysHover: boolean,
 ) {
@@ -123,50 +165,26 @@ export function findHoveredPlotIndex(
     return nearestIndex;
   }
 
-  const withinVerticalBand = (point: { x: number; y: number }) =>
-    plotY >= Math.max(PLOT.top, point.y - verticalDistance) &&
-    plotY <= Math.min(PLOT.bottom, point.y + verticalDistance);
+  const averagePoints = movingAveragePoints(points);
+  if (!averagePoints.length) return -1;
 
-  for (
-    let index = Math.max(0, nearestIndex - 1);
-    index <= Math.min(points.length - 1, nearestIndex + 1);
-    index++
+  let curveIndex = 0;
+  while (
+    curveIndex < averagePoints.length - 1 &&
+    averagePoints[curveIndex + 1].x < plotX
   ) {
-    const point = points[index];
-    const left =
-      index === 0
-        ? PLOT.left
-        : (points[index - 1].x + point.x) / 2;
-    const right =
-      index === points.length - 1
-        ? PLOT.right
-        : (point.x + points[index + 1].x) / 2;
-    if (plotX >= left && plotX <= right && withinVerticalBand(point))
-      return nearestIndex;
+    curveIndex++;
   }
 
-  if (horizontalReach > 0) {
-    low = 0;
-    high = points.length - 1;
-    let firstBandIndex = points.length;
-    while (low <= high) {
-      const mid = (low + high) >> 1;
-      if (points[mid].x + horizontalReach < plotX) low = mid + 1;
-      else {
-        firstBandIndex = mid;
-        high = mid - 1;
-      }
-    }
-    for (
-      let index = firstBandIndex;
-      index < points.length &&
-      points[index].x - horizontalReach <= plotX;
-      index++
-    ) {
-      if (withinVerticalBand(points[index])) return nearestIndex;
-    }
-  }
-  return -1;
+  const left = averagePoints[curveIndex];
+  const right = averagePoints[Math.min(curveIndex + 1, averagePoints.length - 1)];
+  const span = right.x - left.x;
+  const ratio = span > 0 ? (plotX - left.x) / span : 0;
+  const averageY = left.y + (right.y - left.y) * ratio;
+  const upperY = Math.max(PLOT.top, averageY - verticalDistance);
+  const lowerY = Math.min(PLOT.bottom, averageY + verticalDistance);
+
+  return plotY >= upperY && plotY <= lowerY ? nearestIndex : -1;
 }
 
 export function hoverAnchor(
