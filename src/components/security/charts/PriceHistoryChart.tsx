@@ -15,9 +15,11 @@ import {
   clientToPlotX,
   clientToPlotY,
   findHoveredPlotIndex,
+  fullPlotHoverPath,
   hoverAnchor,
   hoverBandPath,
   hoverBasePath,
+  isInsidePlot,
 } from "@/lib/chart/plot";
 import {
   createTimeAxis,
@@ -48,7 +50,9 @@ import {
 import {
   ChartSettingsButton,
   ChartSettingsPanel,
+  HoverBehaviorSelector,
   type ChartSettingsLabels,
+  type HoverBehavior,
 } from "./ChartSettings";
 
 const priceChartLabels: ChartSettingsLabels = {
@@ -141,6 +145,10 @@ export function PriceHistoryChart({
   const [cardDistance, setCardDistance] = useState(20);
   const [hoverDistance, setHoverDistance] = useState(5);
   const [hoverEasing, setHoverEasing] = useState(5);
+  const [hoverBehavior, setHoverBehavior] =
+    useState<HoverBehavior>("dynamic");
+  const [previewHoverBehavior, setPreviewHoverBehavior] =
+    useState<HoverBehavior | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [selected, setSelected] = useState<PriceHover | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
@@ -273,16 +281,26 @@ export function PriceHistoryChart({
   }, [scale]);
 
   const horizontalReach = (PLOT.width * hoverEasing) / 100;
+  const effectiveHoverBehavior =
+    previewHoverBehavior ?? hoverBehavior;
 
   const triggerPath = useMemo(() => {
     if (!showSettings) return "";
+    if (effectiveHoverBehavior === "never") return "";
+    if (effectiveHoverBehavior === "always") return fullPlotHoverPath();
     const base = hoverBasePath(plotPoints, hoverDistance);
     const bands =
       horizontalReach > 0
         ? hoverBandPath(plotPoints, horizontalReach, hoverDistance)
         : "";
     return `${base} ${bands}`;
-  }, [horizontalReach, hoverDistance, plotPoints, showSettings]);
+  }, [
+    effectiveHoverBehavior,
+    horizontalReach,
+    hoverDistance,
+    plotPoints,
+    showSettings,
+  ]);
 
   const selectedPoint = useMemo(() => {
     if (!selected) return null;
@@ -294,18 +312,21 @@ export function PriceHistoryChart({
     (clientX: number, clientY: number): PriceHover | null => {
       const box = chartRef.current?.getBoundingClientRect();
       if (!box || !plotPoints.length) return null;
+      if (hoverBehavior === "never") return null;
+      if (!isInsidePlot(box, clientX, clientY)) return null;
       const plotIndex = findHoveredPlotIndex(
         plotPoints,
         clientToPlotX(box, clientX),
         clientToPlotY(box, clientY),
         horizontalReach,
         hoverDistance,
+        hoverBehavior === "always",
       );
       if (plotIndex < 0) return null;
       const plot = plotPoints[plotIndex];
       return { point: plot.point, ...hoverAnchor(box, plot.x, plot.y) };
     },
-    [horizontalReach, hoverDistance, plotPoints],
+    [hoverBehavior, horizontalReach, hoverDistance, plotPoints],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({
@@ -386,36 +407,15 @@ export function PriceHistoryChart({
               onCardDistanceChange={setCardDistance}
               onLogScaleToggle={() => setLogScale((current) => !current)}
             >
-              <label className="grid gap-1 text-xs font-medium text-slate-400">
-                Hover vertical distance ({hoverDistance}%)
-                <input
-                  aria-label="Hover vertical distance"
-                  type="range"
-                  min="1"
-                  max="50"
-                  step="1"
-                  value={hoverDistance}
-                  onChange={(event) =>
-                    setHoverDistance(Number(event.target.value))
-                  }
-                  className="h-2 cursor-pointer accent-sky-400"
-                />
-              </label>
-              <label className="grid gap-1 text-xs font-medium text-slate-400">
-                Horizontal hover easing percentage ({hoverEasing}%)
-                <input
-                  aria-label="Horizontal hover easing percentage"
-                  type="range"
-                  min="0"
-                  max="25"
-                  step="1"
-                  value={hoverEasing}
-                  onChange={(event) =>
-                    setHoverEasing(Number(event.target.value))
-                  }
-                  className="h-2 cursor-pointer accent-sky-400"
-                />
-              </label>
+              <HoverBehaviorSelector
+                behavior={hoverBehavior}
+                verticalDistance={hoverDistance}
+                horizontalEase={hoverEasing}
+                onBehaviorChange={setHoverBehavior}
+                onVerticalDistanceChange={setHoverDistance}
+                onHorizontalEaseChange={setHoverEasing}
+                onPreviewBehavior={setPreviewHoverBehavior}
+              />
             </ChartSettingsPanel>
           )}
           <PriceSeries

@@ -91,12 +91,17 @@ export function hoverBandPath(
     .join(" ");
 }
 
+export function fullPlotHoverPath() {
+  return `M ${PLOT.left} ${PLOT.top} H ${PLOT.right} V ${PLOT.bottom} H ${PLOT.left} Z`;
+}
+
 export function findHoveredPlotIndex(
   points: { x: number; y: number }[],
   plotX: number,
   plotY: number,
   horizontalReach: number,
   verticalDistance: number,
+  alwaysHover: boolean,
 ) {
   if (
     plotX < PLOT.left ||
@@ -105,6 +110,19 @@ export function findHoveredPlotIndex(
     plotY > PLOT.bottom
   )
     return -1;
+
+  if (alwaysHover) {
+    let closestIndex = 0;
+    let closestDistance = Math.abs(plotX - points[0].x);
+    for (let index = 1; index < points.length; index++) {
+      const distance = Math.abs(plotX - points[index].x);
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closestIndex = index;
+      }
+    }
+    return closestIndex;
+  }
 
   let isHoverable = false;
 
