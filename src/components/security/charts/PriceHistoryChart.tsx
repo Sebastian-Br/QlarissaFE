@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { useChartPointer } from "@/hooks/useChartPointer";
 import { useChartViewport } from "@/hooks/useChartViewport";
@@ -53,6 +53,63 @@ const priceChartLabels: ChartSettingsLabels = {
 interface PriceHover extends HoverAnchor {
   point: DailyPrice;
 }
+
+interface PlotPoint {
+  point: DailyPrice;
+  x: number;
+  y: number;
+}
+
+type TimeAxis = ReturnType<typeof createTimeAxis>;
+
+const PriceSeries = memo(function PriceSeries({
+  name,
+  path,
+  triggerPath,
+  yTicks,
+  yearTicks,
+  tickLabels,
+  selected,
+}: {
+  name: string;
+  path: string;
+  triggerPath: string;
+  yTicks: { ratio: number; position: number }[];
+  yearTicks: TimeAxis["yearTicks"];
+  tickLabels: TimeAxis["tickLabels"];
+  selected: { x: number; y: number } | null;
+}) {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      preserveAspectRatio="none"
+      role="img"
+      aria-label={`${name} price history chart`}
+      className="pointer-events-none h-full w-full overflow-visible"
+    >
+      <ChartGridLines yTicks={yTicks} />
+      <path
+        d={path}
+        fill="none"
+        stroke="#38bdf8"
+        strokeWidth="0.75"
+        vectorEffect="non-scaling-stroke"
+      />
+      <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
+      {triggerPath && <path d={triggerPath} fill="#22c55e" fillOpacity="0.25" />}
+      {selected && (
+        <circle
+          cx={selected.x}
+          cy={selected.y}
+          r="1.55"
+          fill="#7dd3fc"
+          style={{ filter: "drop-shadow(0 0 8px #38bdf8)" }}
+          vectorEffect="non-scaling-stroke"
+        />
+      )}
+    </svg>
+  );
+});
 
 export function PriceHistoryChart({
   security,
@@ -124,106 +181,118 @@ export function PriceHistoryChart({
       setSelected(null);
   }, [selected, visibleHistory]);
 
-  const values = visibleHistory
-    .map((item) => item.average)
-    .filter((value) => Number.isFinite(value));
-  const canUseLog =
-    logScale && values.length > 0 && values.every((value) => value > 0);
-  const minValue = values.length ? Math.min(...values) : 1;
-  const maxValue = values.length ? Math.max(...values) : 1;
-  const min = canUseLog ? Math.log(minValue) : 0;
-  const max = canUseLog ? Math.log(maxValue) : maxValue;
-  const range = max - min || 1;
-  const { calendarStart, calendarRange, axisWidth, xForDate, yearTicks, tickLabels, showTimeHoverCard } =
-    createTimeAxis({
-      firstDate: visibleHistory[0]?.date,
-      lastDate: visibleHistory.at(-1)?.date,
-      chartWidth,
-    });
-
-  const x = (index: number) => {
-    const point = visibleHistory[index];
-    return point ? xForDate(point.date) : 54;
-  };
-  const y = (value: number) =>
-    PLOT.top +
-    ((max - (canUseLog ? Math.log(value) : value)) / range) * PLOT.height;
-  const path = visibleHistory
-    .map(
-      (point, index) =>
-        `${index === 0 ? "M" : "L"} ${x(index)} ${y(point.average)}`,
-    )
-    .join(" ");
-  const yTicks = canUseLog
-    ? [0, 0.33, 0.66, 1].map((ratio, index) => {
-        const rawValue = Math.exp(min + (max - min) * ratio);
-        const value =
-          index === 0 ? minValue : Math.max(1, Math.round(rawValue));
-        return {
-          ratio,
-          value,
-          label:
-            index === 0
-              ? numberFormatter.format(value)
-              : axisNumberFormatter.format(value),
-          position: Math.max(PLOT.top, Math.min(PLOT.bottom, y(value))),
-        };
-      })
-    : [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-        const value = Math.round(max * ratio);
-        return {
-          ratio,
-          value,
-          label: axisNumberFormatter.format(value),
-          position: y(value),
-        };
-      });
-
-  const pointYAt = useCallback(
-    (value: number) =>
-      PLOT.top + ((max - (canUseLog ? Math.log(value) : value)) / range) * PLOT.height,
-    [canUseLog, max, range],
+  const visibleIds = useMemo(
+    () => new Set(visibleHistory.map((point) => point.id)),
+    [visibleHistory],
   );
+
+  const scale = useMemo(() => {
+    const values = visibleHistory
+      .map((item) => item.average)
+      .filter((value) => Number.isFinite(value));
+    const canUseLog =
+      logScale && values.length > 0 && values.every((value) => value > 0);
+    const minValue = values.length ? Math.min(...values) : 1;
+    const maxValue = values.length ? Math.max(...values) : 1;
+    const min = canUseLog ? Math.log(minValue) : 0;
+    const max = canUseLog ? Math.log(maxValue) : maxValue;
+    const range = max - min || 1;
+    const toY = (value: number) =>
+      PLOT.top +
+      ((max - (canUseLog ? Math.log(value) : value)) / range) * PLOT.height;
+    return { canUseLog, minValue, min, max, toY };
+  }, [logScale, visibleHistory]);
+
+  const timeAxis = useMemo(
+    () =>
+      createTimeAxis({
+        firstDate: visibleHistory[0]?.date,
+        lastDate: visibleHistory.at(-1)?.date,
+        chartWidth,
+      }),
+    [chartWidth, visibleHistory],
+  );
+  const { calendarStart, calendarRange, axisWidth, yearTicks, tickLabels, showTimeHoverCard } =
+    timeAxis;
+
+  const plotPoints = useMemo<PlotPoint[]>(
+    () =>
+      visibleHistory.map((point) => ({
+        point,
+        x: dateToPlotX(point.date, calendarStart, calendarRange),
+        y: scale.toY(point.average),
+      })),
+    [calendarRange, calendarStart, scale, visibleHistory],
+  );
+
+  const path = useMemo(
+    () =>
+      plotPoints
+        .map(({ x, y }, index) => `${index === 0 ? "M" : "L"} ${x} ${y}`)
+        .join(" "),
+    [plotPoints],
+  );
+
+  const yTicks = useMemo(() => {
+    const { canUseLog, minValue, min, max, toY } = scale;
+    return canUseLog
+      ? [0, 0.33, 0.66, 1].map((ratio, index) => {
+          const rawValue = Math.exp(min + (max - min) * ratio);
+          const value =
+            index === 0 ? minValue : Math.max(1, Math.round(rawValue));
+          return {
+            ratio,
+            value,
+            label:
+              index === 0
+                ? numberFormatter.format(value)
+                : axisNumberFormatter.format(value),
+            position: Math.max(PLOT.top, Math.min(PLOT.bottom, toY(value))),
+          };
+        })
+      : [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+          const value = Math.round(max * ratio);
+          return {
+            ratio,
+            value,
+            label: axisNumberFormatter.format(value),
+            position: toY(value),
+          };
+        });
+  }, [scale]);
 
   const horizontalReach = (PLOT.width * hoverEasing) / 100;
 
   const triggerPath = useMemo(() => {
     if (!showSettings) return "";
-    const points = visibleHistory.map((point) => ({
-      x: dateToPlotX(point.date, calendarStart, calendarRange),
-      y: pointYAt(point.average),
-    }));
-    return `${hoverBasePath(points, hoverDistance)} ${hoverBandPath(points, horizontalReach, hoverDistance)}`;
-  }, [
-    calendarRange,
-    calendarStart,
-    hoverDistance,
-    horizontalReach,
-    pointYAt,
-    showSettings,
-    visibleHistory,
-  ]);
+    const base = hoverBasePath(plotPoints, hoverDistance);
+    const bands =
+      horizontalReach > 0
+        ? hoverBandPath(plotPoints, horizontalReach, hoverDistance)
+        : "";
+    return `${base} ${bands}`;
+  }, [horizontalReach, hoverDistance, plotPoints, showSettings]);
+
+  const selectedPoint = useMemo(() => {
+    if (!selected) return null;
+    const plot = plotPoints.find((item) => item.point.id === selected.point.id);
+    return plot ? { x: plot.x, y: plot.y } : null;
+  }, [plotPoints, selected]);
 
   const getHover = useCallback(
     (clientX: number, clientY: number): PriceHover | null => {
       const box = chartRef.current?.getBoundingClientRect();
-      if (
-        !box ||
-        !visibleHistory.length ||
-        !isInsidePlot(box, clientX, clientY)
-      )
+      if (!box || !plotPoints.length || !isInsidePlot(box, clientX, clientY))
         return null;
-      const chartX = clientToPlotX(box, clientX);
-      const chartY = clientToPlotY(box, clientY);
-      const point =
-        visibleHistory[nearestDateIndexAtPlotX(visibleHistory, chartX)];
-      const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
-      const pointY = pointYAt(point.average);
-      return Math.abs(chartY - pointY) <= hoverDistance
-        ? { point, ...hoverAnchor(box, pointX, pointY) }
+      const plot =
+        plotPoints[
+          nearestDateIndexAtPlotX(visibleHistory, clientToPlotX(box, clientX))
+        ];
+      return Math.abs(clientToPlotY(box, clientY) - plot.y) <= hoverDistance
+        ? { point: plot.point, ...hoverAnchor(box, plot.x, plot.y) }
         : null;
     },
-    [calendarRange, calendarStart, hoverDistance, pointYAt, visibleHistory],
+    [hoverDistance, plotPoints, visibleHistory],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({
@@ -246,9 +315,22 @@ export function PriceHistoryChart({
       setHovered(getHover(pointerPosition.x, pointerPosition.y));
   }, [getHover, setHovered, viewport.pointerPositionRef]);
 
-  const hoveredDate = hovered
-    ? new Date(`${hovered.point.date}T00:00:00Z`)
-    : null;
+  const hoveredDateKey = hovered?.point.date;
+  const hoveredDate = useMemo(
+    () => (hoveredDateKey ? new Date(`${hoveredDateKey}T00:00:00Z`) : null),
+    [hoveredDateKey],
+  );
+
+  const axisLabels = useMemo(
+    () => (
+      <ChartAxisLabels
+        yTicks={yTicks}
+        yearTicks={yearTicks}
+        tickLabels={tickLabels}
+      />
+    ),
+    [tickLabels, yTicks, yearTicks],
+  );
 
   return (
     <section>
@@ -311,47 +393,18 @@ export function PriceHistoryChart({
               </label>
             </ChartSettingsPanel>
           )}
-          <svg
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            role="img"
-            aria-label={`${security.name} price history chart`}
-            className="pointer-events-none h-full w-full overflow-visible"
-          >
-            <ChartGridLines yTicks={yTicks} />
-            <path
-              d={path}
-              fill="none"
-              stroke="#38bdf8"
-              strokeWidth="0.75"
-              vectorEffect="non-scaling-stroke"
-            />
-            <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
-            {showSettings && (
-              <path d={triggerPath} fill="#22c55e" fillOpacity="0.25" />
-            )}
-            {selected &&
-              visibleHistory.some(
-                (point) => point.id === selected.point.id,
-              ) && (
-                <circle
-                  cx={x(
-                    visibleHistory.findIndex(
-                      (point) => point.id === selected.point.id,
-                    ),
-                  )}
-                  cy={y(selected.point.average)}
-                  r="1.55"
-                  fill="#7dd3fc"
-                  style={{ filter: "drop-shadow(0 0 8px #38bdf8)" }}
-                  vectorEffect="non-scaling-stroke"
-                />
-              )}
-          </svg>
-          {hovered &&
-            visibleHistory.some((point) => point.id === hovered.point.id) && (
-              <ChartCrosshair anchor={hovered} showMarker />
-            )}
+          <PriceSeries
+            name={security.name}
+            path={path}
+            triggerPath={triggerPath}
+            yTicks={yTicks}
+            yearTicks={yearTicks}
+            tickLabels={tickLabels}
+            selected={selectedPoint}
+          />
+          {hovered && visibleIds.has(hovered.point.id) && (
+            <ChartCrosshair anchor={hovered} showMarker />
+          )}
           {hovered && hoveredDate && (
             <ChartHoverLabels
               anchor={hovered}
@@ -362,11 +415,7 @@ export function PriceHistoryChart({
               cardDistance={cardDistance}
             />
           )}
-          <ChartAxisLabels
-            yTicks={yTicks}
-            yearTicks={yearTicks}
-            tickLabels={tickLabels}
-          />
+          {axisLabels}
           {selected && (
             <div
               className="pointer-events-none absolute z-10 min-w-[132px] -translate-x-1/2 -translate-y-full rounded-lg border border-sky-200/20 bg-[#08243d]/80 px-2.5 py-2 opacity-90 shadow-xl"
