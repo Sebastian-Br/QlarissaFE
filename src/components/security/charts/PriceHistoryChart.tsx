@@ -17,8 +17,7 @@ import {
   findHoveredPlotIndex,
   fullPlotHoverPath,
   hoverAnchor,
-  hoverBandPath,
-  hoverBasePath,
+  hoverTriggerPath,
   isInsidePlot,
 } from "@/lib/chart/plot";
 import {
@@ -143,8 +142,12 @@ export function PriceHistoryChart({
   const [endDate, setEndDate] = useState(history.at(-1)?.date ?? "");
   const [logScale, setLogScale] = useState(true);
   const [cardDistance, setCardDistance] = useState(20);
-  const [hoverDistance, setHoverDistance] = useState(5);
-  const [hoverEasing, setHoverEasing] = useState(5);
+  const [hoverSettings, setHoverSettings] = useState({
+    distance: 5,
+    easing: 5,
+  });
+  const hoverDistance = hoverSettings.distance;
+  const hoverEasing = hoverSettings.easing;
   const [hoverBehavior, setHoverBehavior] =
     useState<HoverBehavior>("dynamic");
   const [previewHoverBehavior, setPreviewHoverBehavior] =
@@ -288,12 +291,11 @@ export function PriceHistoryChart({
     if (!showSettings) return "";
     if (effectiveHoverBehavior === "never") return "";
     if (effectiveHoverBehavior === "always") return fullPlotHoverPath();
-    const base = hoverBasePath(plotPoints, hoverDistance);
-    const bands =
-      horizontalReach > 0
-        ? hoverBandPath(plotPoints, horizontalReach, hoverDistance)
-        : "";
-    return `${base} ${bands}`;
+    return hoverTriggerPath(
+      plotPoints,
+      horizontalReach,
+      hoverDistance,
+    );
   }, [
     effectiveHoverBehavior,
     horizontalReach,
@@ -412,8 +414,9 @@ export function PriceHistoryChart({
                 verticalDistance={hoverDistance}
                 horizontalEase={hoverEasing}
                 onBehaviorChange={setHoverBehavior}
-                onVerticalDistanceChange={setHoverDistance}
-                onHorizontalEaseChange={setHoverEasing}
+                onValuesChange={(distance, easing) =>
+                  setHoverSettings({ distance, easing })
+                }
                 onPreviewBehavior={setPreviewHoverBehavior}
               />
             </ChartSettingsPanel>

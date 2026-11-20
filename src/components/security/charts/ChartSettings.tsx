@@ -14,22 +14,22 @@ export function HoverBehaviorSelector({
   verticalDistance,
   horizontalEase,
   onBehaviorChange,
-  onVerticalDistanceChange,
-  onHorizontalEaseChange,
+  onValuesChange,
   onPreviewBehavior,
 }: {
   behavior: HoverBehavior;
   verticalDistance: number;
   horizontalEase: number;
   onBehaviorChange: (behavior: HoverBehavior) => void;
-  onVerticalDistanceChange: (value: number) => void;
-  onHorizontalEaseChange: (value: number) => void;
+  onValuesChange: (verticalDistance: number, horizontalEase: number) => void;
   onPreviewBehavior: (behavior: HoverBehavior | null) => void;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
   const animationFrameRef = useRef<number | null>(null);
   const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const lastUpdateTimeRef = useRef(0);
   const [dragging, setDragging] = useState(false);
+  const previewIntervalMs = 1000 / 30;
 
   useEffect(
     () => () => {
@@ -48,15 +48,29 @@ export function HoverBehaviorSelector({
     const yRatio = Math.max(0, Math.min(1, (clientY - box.top) / box.height));
     const x = 0.1 + xRatio * 19.9;
     const y = 30 - yRatio * 29;
-    onHorizontalEaseChange(Math.round(x * 10) / 10);
-    onVerticalDistanceChange(Math.round(y));
+    const nextHorizontalEase = Math.round(x * 10) / 10;
+    const nextVerticalDistance = Math.round(y);
+    if (
+      nextHorizontalEase !== horizontalEase ||
+      nextVerticalDistance !== verticalDistance
+    ) {
+      onValuesChange(nextVerticalDistance, nextHorizontalEase);
+    }
   };
 
   const schedulePointerUpdate = (clientX: number, clientY: number) => {
     latestPointerRef.current = { x: clientX, y: clientY };
     if (animationFrameRef.current !== null) return;
-    animationFrameRef.current = window.requestAnimationFrame(() => {
+    animationFrameRef.current = window.requestAnimationFrame((timestamp) => {
       animationFrameRef.current = null;
+      if (timestamp - lastUpdateTimeRef.current < previewIntervalMs) {
+        schedulePointerUpdate(
+          latestPointerRef.current?.x ?? clientX,
+          latestPointerRef.current?.y ?? clientY,
+        );
+        return;
+      }
+      lastUpdateTimeRef.current = timestamp;
       const latestPointer = latestPointerRef.current;
       if (latestPointer) {
         updateFromPosition(latestPointer.x, latestPointer.y);
@@ -134,20 +148,22 @@ export function HoverBehaviorSelector({
               onKeyDown={(event) => {
                 if (event.key === "ArrowLeft") {
                   event.preventDefault();
-                  onHorizontalEaseChange(
+                  onValuesChange(
+                    verticalDistance,
                     Math.max(0.1, Math.round((horizontalEase - 0.1) * 10) / 10),
                   );
                 } else if (event.key === "ArrowRight") {
                   event.preventDefault();
-                  onHorizontalEaseChange(
+                  onValuesChange(
+                    verticalDistance,
                     Math.min(20, Math.round((horizontalEase + 0.1) * 10) / 10),
                   );
                 } else if (event.key === "ArrowUp") {
                   event.preventDefault();
-                  onVerticalDistanceChange(Math.min(30, verticalDistance + 1));
+                  onValuesChange(Math.min(30, verticalDistance + 1), horizontalEase);
                 } else if (event.key === "ArrowDown") {
                   event.preventDefault();
-                  onVerticalDistanceChange(Math.max(1, verticalDistance - 1));
+                  onValuesChange(Math.max(1, verticalDistance - 1), horizontalEase);
                 }
               }}
               onPointerUp={(event) => {

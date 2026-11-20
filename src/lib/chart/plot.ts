@@ -53,42 +53,35 @@ export function clientToPlotY(box: DOMRect, clientY: number) {
   );
 }
 
-export function hoverBasePath(
-  points: { x: number; y: number }[],
-  verticalDistance: number,
-) {
-  if (!points.length) return "";
-  const regions = points.map((point, index) => ({
-    left: index === 0 ? PLOT.left : (points[index - 1].x + point.x) / 2,
-    right:
-      index === points.length - 1
-        ? PLOT.right
-        : (point.x + points[index + 1].x) / 2,
-    top: Math.max(PLOT.top, point.y - verticalDistance),
-    bottom: Math.min(PLOT.bottom, point.y + verticalDistance),
-  }));
-  return regions
-    .map(
-      (region) =>
-        `M ${region.left} ${region.top} H ${region.right} V ${region.bottom} H ${region.left} Z`,
-    )
-    .join(" ");
-}
-
-export function hoverBandPath(
+export function hoverTriggerPath(
   points: { x: number; y: number }[],
   horizontalReach: number,
   verticalDistance: number,
 ) {
-  return points
-    .map((point) => {
-      const left = Math.max(PLOT.left, point.x - horizontalReach);
-      const right = Math.min(PLOT.right, point.x + horizontalReach);
-      const top = Math.max(PLOT.top, point.y - verticalDistance);
-      const bottom = Math.min(PLOT.bottom, point.y + verticalDistance);
-      return `M ${left} ${top} H ${right} V ${bottom} H ${left} Z`;
-    })
-    .join(" ");
+  if (!points.length) return "";
+
+  let path = "";
+  for (let index = 0; index < points.length; index++) {
+    const point = points[index];
+    const left =
+      index === 0
+        ? PLOT.left
+        : (points[index - 1].x + point.x) / 2;
+    const right =
+      index === points.length - 1
+        ? PLOT.right
+        : (point.x + points[index + 1].x) / 2;
+    const top = Math.max(PLOT.top, point.y - verticalDistance);
+    const bottom = Math.min(PLOT.bottom, point.y + verticalDistance);
+    path += `M ${left} ${top} H ${right} V ${bottom} H ${left} Z `;
+
+    if (horizontalReach > 0) {
+      const bandLeft = Math.max(PLOT.left, point.x - horizontalReach);
+      const bandRight = Math.min(PLOT.right, point.x + horizontalReach);
+      path += `M ${bandLeft} ${top} H ${bandRight} V ${bottom} H ${bandLeft} Z `;
+    }
+  }
+  return path.trim();
 }
 
 export function fullPlotHoverPath() {
@@ -111,22 +104,34 @@ export function findHoveredPlotIndex(
   )
     return -1;
 
-  if (alwaysHover) {
-    let closestIndex = 0;
-    let closestDistance = Math.abs(plotX - points[0].x);
-    for (let index = 1; index < points.length; index++) {
-      const distance = Math.abs(plotX - points[index].x);
-      if (distance < closestDistance) {
-        closestDistance = distance;
-        closestIndex = index;
-      }
+  let nearestIndex = 0;
+  let nearestDistance = Math.abs(plotX - points[0].x);
+  let low = 0;
+  let high = points.length - 1;
+  while (low <= high) {
+    const mid = (low + high) >> 1;
+    const distance = Math.abs(plotX - points[mid].x);
+    if (distance < nearestDistance) {
+      nearestDistance = distance;
+      nearestIndex = mid;
     }
-    return closestIndex;
+    if (points[mid].x < plotX) low = mid + 1;
+    else high = mid - 1;
   }
 
-  let isHoverable = false;
+  if (alwaysHover) {
+    return nearestIndex;
+  }
 
-  for (let index = 0; index < points.length; index++) {
+  const withinVerticalBand = (point: { x: number; y: number }) =>
+    plotY >= Math.max(PLOT.top, point.y - verticalDistance) &&
+    plotY <= Math.min(PLOT.bottom, point.y + verticalDistance);
+
+  for (
+    let index = Math.max(0, nearestIndex - 1);
+    index <= Math.min(points.length - 1, nearestIndex + 1);
+    index++
+  ) {
     const point = points[index];
     const left =
       index === 0
@@ -136,37 +141,32 @@ export function findHoveredPlotIndex(
       index === points.length - 1
         ? PLOT.right
         : (point.x + points[index + 1].x) / 2;
-    const top = Math.max(PLOT.top, point.y - verticalDistance);
-    const bottom = Math.min(PLOT.bottom, point.y + verticalDistance);
-    const inBaseRegion =
-      plotX >= left &&
-      plotX <= right &&
-      plotY >= top &&
-      plotY <= bottom;
-    const inEasingBand =
-      plotX >= Math.max(PLOT.left, point.x - horizontalReach) &&
-      plotX <= Math.min(PLOT.right, point.x + horizontalReach) &&
-      plotY >= top &&
-      plotY <= bottom;
-
-    if (inBaseRegion || inEasingBand) {
-      isHoverable = true;
-      break;
-    }
+    if (plotX >= left && plotX <= right && withinVerticalBand(point))
+      return nearestIndex;
   }
 
-  if (!isHoverable) return -1;
-
-  let closestIndex = 0;
-  let closestDistance = Math.abs(plotX - points[0].x);
-  for (let index = 1; index < points.length; index++) {
-    const distance = Math.abs(plotX - points[index].x);
-    if (distance < closestDistance) {
-      closestDistance = distance;
-      closestIndex = index;
+  if (horizontalReach > 0) {
+    low = 0;
+    high = points.length - 1;
+    let firstBandIndex = points.length;
+    while (low <= high) {
+      const mid = (low + high) >> 1;
+      if (points[mid].x + horizontalReach < plotX) low = mid + 1;
+      else {
+        firstBandIndex = mid;
+        high = mid - 1;
+      }
+    }
+    for (
+      let index = firstBandIndex;
+      index < points.length &&
+      points[index].x - horizontalReach <= plotX;
+      index++
+    ) {
+      if (withinVerticalBand(points[index])) return nearestIndex;
     }
   }
-  return closestIndex;
+  return -1;
 }
 
 export function hoverAnchor(
