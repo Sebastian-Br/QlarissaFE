@@ -7,9 +7,13 @@ import {
   clientToPlotX,
   clientToPlotY,
   hoverAnchor,
-  hoverTriggerPath,
   isInsidePlot,
 } from "@/lib/chart/plot";
+import {
+  createHoverBand,
+  hoverBandAt,
+  hoverBandPath,
+} from "@/lib/chart/hoverBand";
 import {
   createTimeAxis,
   dateToPlotX,
@@ -177,32 +181,28 @@ export function PriceHistoryChart({
         };
       });
 
-  const triggerPath = useMemo(
+  const pointYAt = useCallback(
+    (value: number) =>
+      PLOT.top + ((max - (canUseLog ? Math.log(value) : value)) / range) * PLOT.height,
+    [canUseLog, max, range],
+  );
+
+  const hoverBand = useMemo(
     () =>
-      showSettings
-        ? hoverTriggerPath(
-            visibleHistory.map((point) => ({
-              x: dateToPlotX(point.date, calendarStart, calendarRange),
-              y:
-                PLOT.top +
-                ((max -
-                  (canUseLog ? Math.log(point.average) : point.average)) /
-                  range) *
-                  PLOT.height,
-            })),
-            hoverDistance,
-          )
-        : "",
-    [
-      calendarRange,
-      calendarStart,
-      canUseLog,
-      hoverDistance,
-      max,
-      range,
-      showSettings,
-      visibleHistory,
-    ],
+      createHoverBand(
+        (plotX) =>
+          pointYAt(
+            visibleHistory[nearestDateIndexAtPlotX(visibleHistory, plotX)]
+              .average,
+          ),
+        hoverDistance,
+      ),
+    [hoverDistance, pointYAt, visibleHistory],
+  );
+
+  const bandPath = useMemo(
+    () => (showSettings ? hoverBandPath(hoverBand) : ""),
+    [hoverBand, showSettings],
   );
 
   const getHover = useCallback(
@@ -216,24 +216,14 @@ export function PriceHistoryChart({
         return null;
       const chartX = clientToPlotX(box, clientX);
       const chartY = clientToPlotY(box, clientY);
+      const band = hoverBandAt(hoverBand, chartX);
+      if (chartY < band.top || chartY > band.bottom) return null;
       const point =
         visibleHistory[nearestDateIndexAtPlotX(visibleHistory, chartX)];
       const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
-      const value = canUseLog ? Math.log(point.average) : point.average;
-      const pointY = PLOT.top + ((max - value) / range) * PLOT.height;
-      return Math.abs(chartY - pointY) <= hoverDistance
-        ? { point, ...hoverAnchor(box, pointX, pointY) }
-        : null;
+      return { point, ...hoverAnchor(box, pointX, pointYAt(point.average)) };
     },
-    [
-      calendarRange,
-      calendarStart,
-      canUseLog,
-      hoverDistance,
-      max,
-      range,
-      visibleHistory,
-    ],
+    [calendarRange, calendarStart, hoverBand, pointYAt, visibleHistory],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({
@@ -323,7 +313,7 @@ export function PriceHistoryChart({
             />
             <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
             {showSettings && (
-              <path d={triggerPath} fill="#22c55e" fillOpacity="0.25" />
+              <path d={bandPath} fill="#22c55e" fillOpacity="0.25" />
             )}
             {selected &&
               visibleHistory.some(
