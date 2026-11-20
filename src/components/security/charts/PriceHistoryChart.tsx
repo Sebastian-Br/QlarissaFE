@@ -111,7 +111,7 @@ const PriceSeries = memo(function PriceSeries({
         vectorEffect="non-scaling-stroke"
       />
       <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
-      {triggerPath && <path d={triggerPath} fill="#22c55e" fillOpacity="0.25" />}
+      {triggerPath && <path d={triggerPath} fill="#22c55e" fillOpacity="0.10" />}
       {selected && (
         <circle
           cx={selected.x}

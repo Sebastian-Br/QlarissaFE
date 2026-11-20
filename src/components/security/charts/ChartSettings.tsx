@@ -77,7 +77,7 @@ export function HoverBehaviorSelector({
           onPointerLeave={() => onPreviewBehavior(null)}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={() => onBehaviorChange("dynamic")}
-          className={`relative block w-full overflow-hidden text-xs font-semibold active:scale-100 ${
+          className={`relative block w-full overflow-hidden text-xs font-semibold transition-[height] duration-300 ease-out motion-reduce:transition-none active:scale-100 ${
             behavior === "dynamic"
               ? "h-44 bg-sky-400 text-slate-950"
               : "h-8 bg-[#061d32] text-slate-300 hover:bg-sky-400/10 hover:text-sky-200"
