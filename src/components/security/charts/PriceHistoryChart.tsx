@@ -4,16 +4,13 @@ import { useChartPointer } from "@/hooks/useChartPointer";
 import { useChartViewport } from "@/hooks/useChartViewport";
 import {
   PLOT,
+  chartInnerHeight,
   clientToPlotX,
   clientToPlotY,
   hoverAnchor,
+  hoverTriggerPath,
   isInsidePlot,
 } from "@/lib/chart/plot";
-import {
-  createHoverBand,
-  hoverBandAt,
-  hoverBandPath,
-} from "@/lib/chart/hoverBand";
 import {
   createTimeAxis,
   dateToPlotX,
@@ -75,17 +72,20 @@ export function PriceHistoryChart({
   const [logScale, setLogScale] = useState(true);
   const [cardDistance, setCardDistance] = useState(20);
   const [hoverDistance, setHoverDistance] = useState(5);
+  const [minHoverPx, setMinHoverPx] = useState(12);
   const [showSettings, setShowSettings] = useState(false);
   const [selected, setSelected] = useState<PriceHover | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
+  const [chartHeight, setChartHeight] = useState(0);
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
-    const observer = new ResizeObserver(([entry]) =>
-      setChartWidth(entry.contentRect.width),
-    );
+    const observer = new ResizeObserver(([entry]) => {
+      setChartWidth(entry.contentRect.width);
+      setChartHeight(chart.getBoundingClientRect().height);
+    });
     observer.observe(chart);
     return () => observer.disconnect();
   }, []);
@@ -187,22 +187,30 @@ export function PriceHistoryChart({
     [canUseLog, max, range],
   );
 
-  const hoverBand = useMemo(
-    () =>
-      createHoverBand(
-        (plotX) =>
-          pointYAt(
-            visibleHistory[nearestDateIndexAtPlotX(visibleHistory, plotX)]
-              .average,
-          ),
-        hoverDistance,
-      ),
-    [hoverDistance, pointYAt, visibleHistory],
-  );
+  const minHoverPercent = chartHeight
+    ? (minHoverPx / chartInnerHeight(chartHeight)) * 100
+    : 0;
+  const verticalDistance = Math.max(hoverDistance, minHoverPercent);
 
-  const bandPath = useMemo(
-    () => (showSettings ? hoverBandPath(hoverBand) : ""),
-    [hoverBand, showSettings],
+  const triggerPath = useMemo(
+    () =>
+      showSettings
+        ? hoverTriggerPath(
+            visibleHistory.map((point) => ({
+              x: dateToPlotX(point.date, calendarStart, calendarRange),
+              y: pointYAt(point.average),
+            })),
+            verticalDistance,
+          )
+        : "",
+    [
+      calendarRange,
+      calendarStart,
+      pointYAt,
+      showSettings,
+      verticalDistance,
+      visibleHistory,
+    ],
   );
 
   const getHover = useCallback(
@@ -216,14 +224,15 @@ export function PriceHistoryChart({
         return null;
       const chartX = clientToPlotX(box, clientX);
       const chartY = clientToPlotY(box, clientY);
-      const band = hoverBandAt(hoverBand, chartX);
-      if (chartY < band.top || chartY > band.bottom) return null;
       const point =
         visibleHistory[nearestDateIndexAtPlotX(visibleHistory, chartX)];
       const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
-      return { point, ...hoverAnchor(box, pointX, pointYAt(point.average)) };
+      const pointY = pointYAt(point.average);
+      return Math.abs(chartY - pointY) <= verticalDistance
+        ? { point, ...hoverAnchor(box, pointX, pointY) }
+        : null;
     },
-    [calendarRange, calendarStart, hoverBand, pointYAt, visibleHistory],
+    [calendarRange, calendarStart, pointYAt, verticalDistance, visibleHistory],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({
@@ -294,6 +303,21 @@ export function PriceHistoryChart({
                   className="h-2 cursor-pointer accent-sky-400"
                 />
               </label>
+              <label className="grid gap-1 text-xs font-medium text-slate-400">
+                Minimum hover vertical distance ({minHoverPx}px)
+                <input
+                  aria-label="Minimum hover vertical distance in pixels"
+                  type="range"
+                  min="0"
+                  max="60"
+                  step="1"
+                  value={minHoverPx}
+                  onChange={(event) =>
+                    setMinHoverPx(Number(event.target.value))
+                  }
+                  className="h-2 cursor-pointer accent-sky-400"
+                />
+              </label>
             </ChartSettingsPanel>
           )}
           <svg
@@ -313,7 +337,7 @@ export function PriceHistoryChart({
             />
             <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
             {showSettings && (
-              <path d={bandPath} fill="#22c55e" fillOpacity="0.25" />
+              <path d={triggerPath} fill="#22c55e" fillOpacity="0.25" />
             )}
             {selected &&
               visibleHistory.some(
