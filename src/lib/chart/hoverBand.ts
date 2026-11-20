@@ -1,7 +1,7 @@
 import { PLOT } from "./plot";
 
 const SAMPLE_COUNT = 241;
-const SMOOTHING_RADIUS = 8;
+const SMOOTHING_RADIUS = 2;
 
 export interface HoverBand {
   top: number[];
