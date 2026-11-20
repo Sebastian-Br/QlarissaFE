@@ -53,37 +53,20 @@ export function clientToPlotY(box: DOMRect, clientY: number) {
   );
 }
 
-export function chartInnerHeight(boxHeight: number) {
-  return boxHeight - SURFACE_INSET_PX * 2;
-}
-
-export function hoverTriggerPath(
+export function hoverBandPath(
   points: { x: number; y: number }[],
+  horizontalReach: number,
   verticalDistance: number,
 ) {
-  if (!points.length) return "";
-  const regions = points.map((point, index) => ({
-    left: index === 0 ? PLOT.left : (points[index - 1].x + point.x) / 2,
-    right:
-      index === points.length - 1
-        ? PLOT.right
-        : (point.x + points[index + 1].x) / 2,
-    top: Math.max(PLOT.top, point.y - verticalDistance),
-    bottom: Math.min(PLOT.bottom, point.y + verticalDistance),
-  }));
-  const last = regions.length - 1;
-  const commands = [`M ${regions[0].left} ${regions[0].top}`];
-  regions.forEach((region, index) => {
-    commands.push(`H ${region.right}`);
-    if (index < last) commands.push(`V ${regions[index + 1].top}`);
-  });
-  commands.push(`V ${regions[last].bottom}`);
-  for (let index = last; index >= 0; index--) {
-    commands.push(`H ${regions[index].left}`);
-    if (index > 0) commands.push(`V ${regions[index - 1].bottom}`);
-  }
-  commands.push("Z");
-  return commands.join(" ");
+  return points
+    .map((point) => {
+      const left = Math.max(PLOT.left, point.x - horizontalReach);
+      const right = Math.min(PLOT.right, point.x + horizontalReach);
+      const top = Math.max(PLOT.top, point.y - verticalDistance);
+      const bottom = Math.min(PLOT.bottom, point.y + verticalDistance);
+      return `M ${left} ${top} H ${right} V ${bottom} H ${left} Z`;
+    })
+    .join(" ");
 }
 
 export function hoverAnchor(

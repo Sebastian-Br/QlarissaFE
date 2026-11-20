@@ -4,11 +4,10 @@ import { useChartPointer } from "@/hooks/useChartPointer";
 import { useChartViewport } from "@/hooks/useChartViewport";
 import {
   PLOT,
-  chartInnerHeight,
   clientToPlotX,
   clientToPlotY,
   hoverAnchor,
-  hoverTriggerPath,
+  hoverBandPath,
   isInsidePlot,
 } from "@/lib/chart/plot";
 import {
@@ -72,11 +71,10 @@ export function PriceHistoryChart({
   const [logScale, setLogScale] = useState(true);
   const [cardDistance, setCardDistance] = useState(20);
   const [hoverDistance, setHoverDistance] = useState(5);
-  const [minHoverPx, setMinHoverPx] = useState(12);
+  const [hoverEasing, setHoverEasing] = useState(5);
   const [showSettings, setShowSettings] = useState(false);
   const [selected, setSelected] = useState<PriceHover | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
-  const [chartHeight, setChartHeight] = useState(0);
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -84,7 +82,6 @@ export function PriceHistoryChart({
     if (!chart) return;
     const observer = new ResizeObserver(([entry]) => {
       setChartWidth(entry.contentRect.width);
-      setChartHeight(chart.getBoundingClientRect().height);
     });
     observer.observe(chart);
     return () => observer.disconnect();
@@ -187,28 +184,27 @@ export function PriceHistoryChart({
     [canUseLog, max, range],
   );
 
-  const minHoverPercent = chartHeight
-    ? (minHoverPx / chartInnerHeight(chartHeight)) * 100
-    : 0;
-  const verticalDistance = Math.max(hoverDistance, minHoverPercent);
+  const horizontalReach = (PLOT.width * hoverEasing) / 100;
 
   const triggerPath = useMemo(
     () =>
       showSettings
-        ? hoverTriggerPath(
+        ? hoverBandPath(
             visibleHistory.map((point) => ({
               x: dateToPlotX(point.date, calendarStart, calendarRange),
               y: pointYAt(point.average),
             })),
-            verticalDistance,
+            horizontalReach,
+            hoverDistance,
           )
         : "",
     [
       calendarRange,
       calendarStart,
+      hoverDistance,
+      horizontalReach,
       pointYAt,
       showSettings,
-      verticalDistance,
       visibleHistory,
     ],
   );
@@ -228,11 +224,19 @@ export function PriceHistoryChart({
         visibleHistory[nearestDateIndexAtPlotX(visibleHistory, chartX)];
       const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
       const pointY = pointYAt(point.average);
-      return Math.abs(chartY - pointY) <= verticalDistance
+      return Math.abs(chartX - pointX) <= horizontalReach &&
+        Math.abs(chartY - pointY) <= hoverDistance
         ? { point, ...hoverAnchor(box, pointX, pointY) }
         : null;
     },
-    [calendarRange, calendarStart, pointYAt, verticalDistance, visibleHistory],
+    [
+      calendarRange,
+      calendarStart,
+      horizontalReach,
+      hoverDistance,
+      pointYAt,
+      visibleHistory,
+    ],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({
@@ -304,16 +308,16 @@ export function PriceHistoryChart({
                 />
               </label>
               <label className="grid gap-1 text-xs font-medium text-slate-400">
-                Minimum hover vertical distance ({minHoverPx}px)
+                Horizontal hover easing percentage ({hoverEasing}%)
                 <input
-                  aria-label="Minimum hover vertical distance in pixels"
+                  aria-label="Horizontal hover easing percentage"
                   type="range"
                   min="0"
-                  max="60"
+                  max="25"
                   step="1"
-                  value={minHoverPx}
+                  value={hoverEasing}
                   onChange={(event) =>
-                    setMinHoverPx(Number(event.target.value))
+                    setHoverEasing(Number(event.target.value))
                   }
                   className="h-2 cursor-pointer accent-sky-400"
                 />
