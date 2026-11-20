@@ -53,6 +53,28 @@ export function clientToPlotY(box: DOMRect, clientY: number) {
   );
 }
 
+export function hoverBasePath(
+  points: { x: number; y: number }[],
+  verticalDistance: number,
+) {
+  if (!points.length) return "";
+  const regions = points.map((point, index) => ({
+    left: index === 0 ? PLOT.left : (points[index - 1].x + point.x) / 2,
+    right:
+      index === points.length - 1
+        ? PLOT.right
+        : (point.x + points[index + 1].x) / 2,
+    top: Math.max(PLOT.top, point.y - verticalDistance),
+    bottom: Math.min(PLOT.bottom, point.y + verticalDistance),
+  }));
+  return regions
+    .map(
+      (region) =>
+        `M ${region.left} ${region.top} H ${region.right} V ${region.bottom} H ${region.left} Z`,
+    )
+    .join(" ");
+}
+
 export function hoverBandPath(
   points: { x: number; y: number }[],
   horizontalReach: number,

@@ -8,6 +8,7 @@ import {
   clientToPlotY,
   hoverAnchor,
   hoverBandPath,
+  hoverBasePath,
   isInsidePlot,
 } from "@/lib/chart/plot";
 import {
@@ -186,28 +187,22 @@ export function PriceHistoryChart({
 
   const horizontalReach = (PLOT.width * hoverEasing) / 100;
 
-  const triggerPath = useMemo(
-    () =>
-      showSettings
-        ? hoverBandPath(
-            visibleHistory.map((point) => ({
-              x: dateToPlotX(point.date, calendarStart, calendarRange),
-              y: pointYAt(point.average),
-            })),
-            horizontalReach,
-            hoverDistance,
-          )
-        : "",
-    [
-      calendarRange,
-      calendarStart,
-      hoverDistance,
-      horizontalReach,
-      pointYAt,
-      showSettings,
-      visibleHistory,
-    ],
-  );
+  const triggerPath = useMemo(() => {
+    if (!showSettings) return "";
+    const points = visibleHistory.map((point) => ({
+      x: dateToPlotX(point.date, calendarStart, calendarRange),
+      y: pointYAt(point.average),
+    }));
+    return `${hoverBasePath(points, hoverDistance)} ${hoverBandPath(points, horizontalReach, hoverDistance)}`;
+  }, [
+    calendarRange,
+    calendarStart,
+    hoverDistance,
+    horizontalReach,
+    pointYAt,
+    showSettings,
+    visibleHistory,
+  ]);
 
   const getHover = useCallback(
     (clientX: number, clientY: number): PriceHover | null => {
@@ -224,19 +219,11 @@ export function PriceHistoryChart({
         visibleHistory[nearestDateIndexAtPlotX(visibleHistory, chartX)];
       const pointX = dateToPlotX(point.date, calendarStart, calendarRange);
       const pointY = pointYAt(point.average);
-      return Math.abs(chartX - pointX) <= horizontalReach &&
-        Math.abs(chartY - pointY) <= hoverDistance
+      return Math.abs(chartY - pointY) <= hoverDistance
         ? { point, ...hoverAnchor(box, pointX, pointY) }
         : null;
     },
-    [
-      calendarRange,
-      calendarStart,
-      horizontalReach,
-      hoverDistance,
-      pointYAt,
-      visibleHistory,
-    ],
+    [calendarRange, calendarStart, hoverDistance, pointYAt, visibleHistory],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({
