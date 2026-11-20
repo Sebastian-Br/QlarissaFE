@@ -46,7 +46,7 @@ export function HoverBehaviorSelector({
     const box = map.getBoundingClientRect();
     const xRatio = Math.max(0, Math.min(1, (clientX - box.left) / box.width));
     const yRatio = Math.max(0, Math.min(1, (clientY - box.top) / box.height));
-    const x = 0.1 + xRatio * 19.9;
+    const x = xRatio * 10;
     const y = 30 - yRatio * 29;
     const nextHorizontalEase = Math.round(x * 10) / 10;
     const nextVerticalDistance = Math.round(y);
@@ -86,7 +86,7 @@ export function HoverBehaviorSelector({
     schedulePointerUpdate(event.clientX, event.clientY);
   };
 
-  const xRatio = (horizontalEase - 0.1) / 19.9;
+  const xRatio = horizontalEase / 10;
   const yRatio = (30 - verticalDistance) / 29;
 
   return (
@@ -150,13 +150,13 @@ export function HoverBehaviorSelector({
                   event.preventDefault();
                   onValuesChange(
                     verticalDistance,
-                    Math.max(0.1, Math.round((horizontalEase - 0.1) * 10) / 10),
+                    Math.max(0, Math.round((horizontalEase - 0.1) * 10) / 10),
                   );
                 } else if (event.key === "ArrowRight") {
                   event.preventDefault();
                   onValuesChange(
                     verticalDistance,
-                    Math.min(20, Math.round((horizontalEase + 0.1) * 10) / 10),
+                    Math.min(10, Math.round((horizontalEase + 0.1) * 10) / 10),
                   );
                 } else if (event.key === "ArrowUp") {
                   event.preventDefault();

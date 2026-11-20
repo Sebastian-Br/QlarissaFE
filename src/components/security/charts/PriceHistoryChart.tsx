@@ -16,9 +16,11 @@ import {
   clientToPlotY,
   findHoveredPlotIndex,
   fullPlotHoverPath,
+  horizontalLineTouchesHoverSurface,
   hoverAnchor,
   hoverTriggerPath,
   isInsidePlot,
+  movingAveragePoints,
 } from "@/lib/chart/plot";
 import {
   createTimeAxis,
@@ -67,6 +69,7 @@ interface PriceHover extends HoverAnchor {
 
 interface PlotPoint {
   point: DailyPrice;
+  date: string;
   x: number;
   y: number;
 }
@@ -80,6 +83,11 @@ const PriceSeries = memo(function PriceSeries({
   name,
   path,
   triggerPath,
+  cursorX,
+  cursorY,
+  horizontalReach,
+  showHorizontalEase,
+  horizontalEaseTouches,
   yTicks,
   yearTicks,
   tickLabels,
@@ -88,6 +96,11 @@ const PriceSeries = memo(function PriceSeries({
   name: string;
   path: string;
   triggerPath: string;
+  cursorX: number | null;
+  cursorY: number | null;
+  horizontalReach: number;
+  showHorizontalEase: boolean;
+  horizontalEaseTouches: boolean;
   yTicks: { ratio: number; position: number }[];
   yearTicks: TimeAxis["yearTicks"];
   tickLabels: TimeAxis["tickLabels"];
@@ -111,6 +124,20 @@ const PriceSeries = memo(function PriceSeries({
       />
       <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
       {triggerPath && <path d={triggerPath} fill="#22c55e" fillOpacity="0.10" />}
+      {showHorizontalEase &&
+        cursorX !== null &&
+        cursorY !== null && (
+          <line
+            x1={Math.max(PLOT.left, cursorX - horizontalReach)}
+            x2={Math.min(PLOT.right, cursorX + horizontalReach)}
+            y1={Math.max(PLOT.top, Math.min(PLOT.bottom, cursorY))}
+            y2={Math.max(PLOT.top, Math.min(PLOT.bottom, cursorY))}
+            stroke={horizontalEaseTouches ? "#22c55e" : "#7dd3fc"}
+            strokeOpacity="0.75"
+            strokeDasharray="2 2"
+            vectorEffect="non-scaling-stroke"
+          />
+        )}
       {selected && (
         <circle
           cx={selected.x}
@@ -152,6 +179,9 @@ export function PriceHistoryChart({
     useState<HoverBehavior>("dynamic");
   const [previewHoverBehavior, setPreviewHoverBehavior] =
     useState<HoverBehavior | null>(null);
+  const [cursorPlot, setCursorPlot] = useState<{ x: number; y: number } | null>(
+    null,
+  );
   const [showSettings, setShowSettings] = useState(false);
   const [selected, setSelected] = useState<PriceHover | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
@@ -241,10 +271,15 @@ export function PriceHistoryChart({
     () =>
       visibleHistory.map((point) => ({
         point,
+        date: point.date,
         x: dateToPlotX(point.date, calendarStart, calendarRange),
         y: scale.toY(point.average),
       })),
     [calendarRange, calendarStart, scale, visibleHistory],
+  );
+  const movingAveragePlotPoints = useMemo(
+    () => movingAveragePoints(plotPoints),
+    [plotPoints],
   );
 
   const path = useMemo(
@@ -295,11 +330,13 @@ export function PriceHistoryChart({
       plotPoints,
       horizontalReach,
       hoverDistance,
+      movingAveragePlotPoints,
     );
   }, [
     effectiveHoverBehavior,
     horizontalReach,
     hoverDistance,
+    movingAveragePlotPoints,
     plotPoints,
     showSettings,
   ]);
@@ -316,19 +353,33 @@ export function PriceHistoryChart({
       if (!box || !plotPoints.length) return null;
       if (hoverBehavior === "never") return null;
       if (!isInsidePlot(box, clientX, clientY)) return null;
+      const cursorX = clientToPlotX(box, clientX);
+      const cursorY = clientToPlotY(box, clientY);
       const plotIndex = findHoveredPlotIndex(
         plotPoints,
-        clientToPlotX(box, clientX),
-        clientToPlotY(box, clientY),
+        cursorX,
+        cursorY,
         horizontalReach,
         hoverDistance,
         hoverBehavior === "always",
+        movingAveragePlotPoints,
       );
       if (plotIndex < 0) return null;
       const plot = plotPoints[plotIndex];
-      return { point: plot.point, ...hoverAnchor(box, plot.x, plot.y) };
+      return {
+        point: plot.point,
+        cursorX,
+        cursorY,
+        ...hoverAnchor(box, plot.x, plot.y),
+      };
     },
-    [hoverBehavior, horizontalReach, hoverDistance, plotPoints],
+    [
+      hoverBehavior,
+      horizontalReach,
+      hoverDistance,
+      movingAveragePlotPoints,
+      plotPoints,
+    ],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({
@@ -353,15 +404,46 @@ export function PriceHistoryChart({
 
   const surfaceHandlers = {
     ...pointerHandlers,
+    onPointerLeave: () => {
+      pointerHandlers.onPointerLeave();
+      setCursorPlot(null);
+    },
     onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
       if (isChartOverlay(event.target)) {
         viewport.pointerPositionRef.current = null;
         setHovered(null);
+        setCursorPlot(null);
         return;
+      }
+      const box = chartRef.current?.getBoundingClientRect();
+      if (box) {
+        setCursorPlot({
+          x: clientToPlotX(box, event.clientX),
+          y: clientToPlotY(box, event.clientY),
+        });
       }
       pointerHandlers.onPointerMove(event);
     },
   };
+
+  const horizontalEaseTouches = useMemo(
+    () =>
+      cursorPlot !== null &&
+      horizontalLineTouchesHoverSurface(
+        plotPoints,
+        cursorPlot.x,
+        cursorPlot.y,
+        horizontalReach,
+        hoverDistance,
+        movingAveragePlotPoints,
+      ),
+    [
+      cursorPlot,
+      horizontalReach,
+      hoverDistance,
+      movingAveragePlotPoints,
+    ],
+  );
 
   const hoveredDateKey = hovered?.point.date;
   const hoveredDate = useMemo(
@@ -425,6 +507,15 @@ export function PriceHistoryChart({
             name={security.name}
             path={path}
             triggerPath={triggerPath}
+            cursorX={cursorPlot?.x ?? null}
+            cursorY={cursorPlot?.y ?? null}
+            horizontalReach={horizontalReach}
+            showHorizontalEase={
+              showSettings &&
+              hoverBehavior === "dynamic" &&
+              horizontalReach > 0
+            }
+            horizontalEaseTouches={horizontalEaseTouches}
             yTicks={yTicks}
             yearTicks={yearTicks}
             tickLabels={tickLabels}

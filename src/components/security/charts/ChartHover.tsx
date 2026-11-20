@@ -5,6 +5,8 @@ export interface HoverAnchor {
   y: number;
   axisX: number;
   axisY: number;
+  cursorX?: number;
+  cursorY?: number;
 }
 
 const HOVER_CARD_MIN_LEFT_PX = 54;
