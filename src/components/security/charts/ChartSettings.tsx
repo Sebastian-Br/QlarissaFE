@@ -1,4 +1,10 @@
-import { useRef, useState, type PointerEvent, type ReactNode } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type PointerEvent,
+  type ReactNode,
+} from "react";
 import { LineChart, Settings } from "lucide-react";
 
 export type HoverBehavior = "never" | "always" | "dynamic";
@@ -21,18 +27,41 @@ export function HoverBehaviorSelector({
   onPreviewBehavior: (behavior: HoverBehavior | null) => void;
 }) {
   const mapRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
   const [dragging, setDragging] = useState(false);
 
-  const updateFromPointer = (event: PointerEvent<HTMLDivElement>) => {
+  useEffect(
+    () => () => {
+      if (animationFrameRef.current !== null) {
+        window.cancelAnimationFrame(animationFrameRef.current);
+      }
+    },
+    [],
+  );
+
+  const updateFromPosition = (clientX: number, clientY: number) => {
     const map = mapRef.current;
     if (!map) return;
     const box = map.getBoundingClientRect();
-    const xRatio = Math.max(0, Math.min(1, (event.clientX - box.left) / box.width));
-    const yRatio = Math.max(0, Math.min(1, (event.clientY - box.top) / box.height));
+    const xRatio = Math.max(0, Math.min(1, (clientX - box.left) / box.width));
+    const yRatio = Math.max(0, Math.min(1, (clientY - box.top) / box.height));
     const x = 0.1 + xRatio * 19.9;
     const y = 30 - yRatio * 29;
     onHorizontalEaseChange(Math.round(x * 10) / 10);
     onVerticalDistanceChange(Math.round(y));
+  };
+
+  const schedulePointerUpdate = (clientX: number, clientY: number) => {
+    latestPointerRef.current = { x: clientX, y: clientY };
+    if (animationFrameRef.current !== null) return;
+    animationFrameRef.current = window.requestAnimationFrame(() => {
+      animationFrameRef.current = null;
+      const latestPointer = latestPointerRef.current;
+      if (latestPointer) {
+        updateFromPosition(latestPointer.x, latestPointer.y);
+      }
+    });
   };
 
   const startDragging = (event: PointerEvent<HTMLDivElement>) => {
@@ -40,7 +69,7 @@ export function HoverBehaviorSelector({
     event.stopPropagation();
     setDragging(true);
     event.currentTarget.setPointerCapture(event.pointerId);
-    updateFromPointer(event);
+    schedulePointerUpdate(event.clientX, event.clientY);
   };
 
   const xRatio = (horizontalEase - 0.1) / 19.9;
@@ -98,7 +127,9 @@ export function HoverBehaviorSelector({
               tabIndex={0}
               onPointerDown={startDragging}
               onPointerMove={(event) => {
-                if (dragging) updateFromPointer(event);
+                if (dragging) {
+                  schedulePointerUpdate(event.clientX, event.clientY);
+                }
               }}
               onKeyDown={(event) => {
                 if (event.key === "ArrowLeft") {
@@ -120,12 +151,28 @@ export function HoverBehaviorSelector({
                 }
               }}
               onPointerUp={(event) => {
+                schedulePointerUpdate(event.clientX, event.clientY);
+                if (animationFrameRef.current !== null) {
+                  window.cancelAnimationFrame(animationFrameRef.current);
+                  animationFrameRef.current = null;
+                }
+                const latestPointer = latestPointerRef.current;
+                if (latestPointer) {
+                  updateFromPosition(latestPointer.x, latestPointer.y);
+                }
                 if (event.currentTarget.hasPointerCapture(event.pointerId)) {
                   event.currentTarget.releasePointerCapture(event.pointerId);
                 }
                 setDragging(false);
               }}
-              onPointerCancel={() => setDragging(false)}
+              onPointerCancel={() => {
+                if (animationFrameRef.current !== null) {
+                  window.cancelAnimationFrame(animationFrameRef.current);
+                  animationFrameRef.current = null;
+                }
+                latestPointerRef.current = null;
+                setDragging(false);
+              }}
               className="absolute bottom-3 left-3 right-3 top-10 touch-none cursor-crosshair border border-sky-300/30 bg-[#061d32]"
               style={{
                 backgroundImage:
