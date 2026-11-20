@@ -14,10 +14,10 @@ import {
   PLOT,
   clientToPlotX,
   clientToPlotY,
+  findHoveredPlotIndex,
   hoverAnchor,
   hoverBandPath,
   hoverBasePath,
-  isInsidePlot,
 } from "@/lib/chart/plot";
 import {
   createTimeAxis,
@@ -293,17 +293,19 @@ export function PriceHistoryChart({
   const getHover = useCallback(
     (clientX: number, clientY: number): PriceHover | null => {
       const box = chartRef.current?.getBoundingClientRect();
-      if (!box || !plotPoints.length || !isInsidePlot(box, clientX, clientY))
-        return null;
-      const plot =
-        plotPoints[
-          nearestDateIndexAtPlotX(visibleHistory, clientToPlotX(box, clientX))
-        ];
-      return Math.abs(clientToPlotY(box, clientY) - plot.y) <= hoverDistance
-        ? { point: plot.point, ...hoverAnchor(box, plot.x, plot.y) }
-        : null;
+      if (!box || !plotPoints.length) return null;
+      const plotIndex = findHoveredPlotIndex(
+        plotPoints,
+        clientToPlotX(box, clientX),
+        clientToPlotY(box, clientY),
+        horizontalReach,
+        hoverDistance,
+      );
+      if (plotIndex < 0) return null;
+      const plot = plotPoints[plotIndex];
+      return { point: plot.point, ...hoverAnchor(box, plot.x, plot.y) };
     },
-    [hoverDistance, plotPoints, visibleHistory],
+    [horizontalReach, hoverDistance, plotPoints],
   );
 
   const { hovered, setHovered, pointerHandlers } = useChartPointer<PriceHover>({

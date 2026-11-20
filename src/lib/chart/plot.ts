@@ -91,6 +91,66 @@ export function hoverBandPath(
     .join(" ");
 }
 
+export function findHoveredPlotIndex(
+  points: { x: number; y: number }[],
+  plotX: number,
+  plotY: number,
+  horizontalReach: number,
+  verticalDistance: number,
+) {
+  if (
+    plotX < PLOT.left ||
+    plotX > PLOT.right ||
+    plotY < PLOT.top ||
+    plotY > PLOT.bottom
+  )
+    return -1;
+
+  let isHoverable = false;
+
+  for (let index = 0; index < points.length; index++) {
+    const point = points[index];
+    const left =
+      index === 0
+        ? PLOT.left
+        : (points[index - 1].x + point.x) / 2;
+    const right =
+      index === points.length - 1
+        ? PLOT.right
+        : (point.x + points[index + 1].x) / 2;
+    const top = Math.max(PLOT.top, point.y - verticalDistance);
+    const bottom = Math.min(PLOT.bottom, point.y + verticalDistance);
+    const inBaseRegion =
+      plotX >= left &&
+      plotX <= right &&
+      plotY >= top &&
+      plotY <= bottom;
+    const inEasingBand =
+      plotX >= Math.max(PLOT.left, point.x - horizontalReach) &&
+      plotX <= Math.min(PLOT.right, point.x + horizontalReach) &&
+      plotY >= top &&
+      plotY <= bottom;
+
+    if (inBaseRegion || inEasingBand) {
+      isHoverable = true;
+      break;
+    }
+  }
+
+  if (!isHoverable) return -1;
+
+  let closestIndex = 0;
+  let closestDistance = Math.abs(plotX - points[0].x);
+  for (let index = 1; index < points.length; index++) {
+    const distance = Math.abs(plotX - points[index].x);
+    if (distance < closestDistance) {
+      closestDistance = distance;
+      closestIndex = index;
+    }
+  }
+  return closestIndex;
+}
+
 export function hoverAnchor(
   box: Pick<DOMRect, "width" | "height">,
   pointX: number,
