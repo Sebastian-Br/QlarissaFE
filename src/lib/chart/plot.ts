@@ -55,7 +55,6 @@ export function clientToPlotY(box: DOMRect, clientY: number) {
 
 export function hoverTriggerPath(
   points: { x: number; y: number }[],
-  _horizontalReach: number,
   verticalDistance: number,
   averagePointsOverride?: { x: number; y: number }[],
 ) {
@@ -87,14 +86,15 @@ export function movingAverageHoverPath(
       y: Math.min(PLOT.bottom, point.y + verticalDistance),
     }));
 
-  let path = `M ${upper[0].x} ${upper[0].y}`;
+  const pathChunks = [`M ${upper[0].x} ${upper[0].y}`];
   for (let index = 1; index < upper.length; index++) {
-    path += ` L ${upper[index].x} ${upper[index].y}`;
+    pathChunks.push(`L ${upper[index].x} ${upper[index].y}`);
   }
   for (let index = lower.length - 1; index >= 0; index--) {
-    path += ` L ${lower[index].x} ${lower[index].y}`;
+    pathChunks.push(`L ${lower[index].x} ${lower[index].y}`);
   }
-  return `${path} Z`;
+  pathChunks.push("Z");
+  return pathChunks.join(" ");
 }
 
 export function fullPlotHoverPath() {

@@ -328,13 +328,11 @@ export function PriceHistoryChart({
     if (effectiveHoverBehavior === "always") return fullPlotHoverPath();
     return hoverTriggerPath(
       plotPoints,
-      horizontalReach,
       hoverDistance,
       movingAveragePlotPoints,
     );
   }, [
     effectiveHoverBehavior,
-    horizontalReach,
     hoverDistance,
     movingAveragePlotPoints,
     plotPoints,
