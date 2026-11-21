@@ -53,151 +53,78 @@ export function clientToPlotY(box: DOMRect, clientY: number) {
   );
 }
 
-export function hoverTriggerPath(
-  points: { x: number; y: number }[],
-  verticalDistance: number,
-  averagePointsOverride?: { x: number; y: number }[],
-) {
-  return movingAverageHoverPath(
-    points,
-    verticalDistance,
-    averagePointsOverride,
-  );
-}
-
-export function movingAverageHoverPath(
-  points: ({ x: number; y: number } & { date?: string })[],
-  verticalDistance: number,
-  averagePointsOverride?: { x: number; y: number }[],
-) {
-  if (!points.length) return "";
-  const averagePoints =
-    averagePointsOverride ?? movingAveragePoints(points);
-  if (!averagePoints.length) return "";
-
-  const upper = averagePoints
-    .map((point) => ({
-      x: point.x,
-      y: Math.max(PLOT.top, point.y - verticalDistance),
-    }));
-  const lower = averagePoints
-    .map((point) => ({
-      x: point.x,
-      y: Math.min(PLOT.bottom, point.y + verticalDistance),
-    }));
-
-  const pathChunks = [`M ${upper[0].x} ${upper[0].y}`];
-  for (let index = 1; index < upper.length; index++) {
-    pathChunks.push(`L ${upper[index].x} ${upper[index].y}`);
-  }
-  for (let index = lower.length - 1; index >= 0; index--) {
-    pathChunks.push(`L ${lower[index].x} ${lower[index].y}`);
-  }
-  pathChunks.push("Z");
-  return pathChunks.join(" ");
-}
-
 export function fullPlotHoverPath() {
   return `M ${PLOT.left} ${PLOT.top} H ${PLOT.right} V ${PLOT.bottom} H ${PLOT.left} Z`;
 }
 
-export function movingAveragePoints(
-  points: ({ x: number; y: number } & { date?: string })[],
+function pointToSegmentDistance(
+  pointX: number,
+  pointY: number,
+  startX: number,
+  startY: number,
+  endX: number,
+  endY: number,
 ) {
-  if (!points.length) return [];
-
-  const averages: { x: number; y: number }[] = [];
-  let windowStart = 0;
-  let sum = 0;
-
-  for (let index = 0; index < points.length; index++) {
-    const currentDate = points[index].date
-      ? Date.parse(`${points[index].date!.slice(0, 10)}T00:00:00Z`)
-      : index;
-    sum += points[index].y;
-
-    while (windowStart < index) {
-      const startDate = points[windowStart].date
-        ? Date.parse(`${points[windowStart].date!.slice(0, 10)}T00:00:00Z`)
-        : windowStart;
-      const isOutsideWindow =
-        points[index].date && points[windowStart].date
-          ? currentDate - startDate > 29 * 86_400_000
-          : index - windowStart >= 30;
-      if (!isOutsideWindow) break;
-      sum -= points[windowStart].y;
-      windowStart++;
-    }
-
-    averages.push({
-      x: points[index].x,
-      y: sum / (index - windowStart + 1),
-    });
+  const deltaX = endX - startX;
+  const deltaY = endY - startY;
+  const lengthSquared = deltaX * deltaX + deltaY * deltaY;
+  if (lengthSquared === 0) {
+    const offsetX = pointX - startX;
+    const offsetY = pointY - startY;
+    return Math.sqrt(offsetX * offsetX + offsetY * offsetY);
   }
-  return averages;
+  const ratio = Math.max(
+    0,
+    Math.min(
+      1,
+      ((pointX - startX) * deltaX + (pointY - startY) * deltaY) /
+        lengthSquared,
+    ),
+  );
+  const closestX = startX + ratio * deltaX;
+  const closestY = startY + ratio * deltaY;
+  const offsetX = pointX - closestX;
+  const offsetY = pointY - closestY;
+  return Math.sqrt(offsetX * offsetX + offsetY * offsetY);
 }
 
-export function horizontalLineTouchesHoverSurface(
+export function circleTouchesPlot(
   points: { x: number; y: number }[],
-  lineX: number,
-  lineY: number,
-  horizontalReach: number,
-  verticalDistance: number,
-  averagePointsOverride?: { x: number; y: number }[],
+  circleX: number,
+  circleY: number,
+  radius: number,
+  plotWidthScale = 1,
+  plotHeightScale = 1,
 ) {
   if (
-    lineX < PLOT.left ||
-    lineX > PLOT.right ||
-    lineY < PLOT.top ||
-    lineY > PLOT.bottom ||
-    horizontalReach <= 0
+    circleX < PLOT.left ||
+    circleX > PLOT.right ||
+    circleY < PLOT.top ||
+    circleY > PLOT.bottom
   )
     return false;
 
-  const averagePoints =
-    averagePointsOverride ?? movingAveragePoints(points);
-  const lineLeft = Math.max(PLOT.left, lineX - horizontalReach);
-  const lineRight = Math.min(PLOT.right, lineX + horizontalReach);
-
-  let low = 0;
-  let high = averagePoints.length - 1;
-  let firstIndex = 0;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (averagePoints[mid].x < lineLeft) low = mid + 1;
-    else {
-      firstIndex = mid;
-      high = mid - 1;
-    }
-  }
-
-  for (
-    let index = Math.max(0, firstIndex - 1);
-    index < averagePoints.length - 1;
-    index++
-  ) {
-    const left = averagePoints[index];
-    const right = averagePoints[index + 1];
-    if (right.x < lineLeft) continue;
-    if (left.x > lineRight) break;
-
-    const overlapLeft = Math.max(lineLeft, left.x);
-    const overlapRight = Math.min(lineRight, right.x);
-    if (overlapRight < overlapLeft) continue;
-
-    const span = right.x - left.x;
-    if (span <= 0) continue;
-    const ratioLeft = (overlapLeft - left.x) / span;
-    const ratioRight = (overlapRight - left.x) / span;
-    const averageLeft = left.y + (right.y - left.y) * ratioLeft;
-    const averageRight = left.y + (right.y - left.y) * ratioRight;
-    const upperLeft = Math.max(PLOT.top, averageLeft - verticalDistance);
-    const upperRight = Math.max(PLOT.top, averageRight - verticalDistance);
-    const lowerLeft = Math.min(PLOT.bottom, averageLeft + verticalDistance);
-    const lowerRight = Math.min(PLOT.bottom, averageRight + verticalDistance);
-    const highestUpper = Math.max(upperLeft, upperRight);
-    const lowestLower = Math.min(lowerLeft, lowerRight);
-    if (lineY >= highestUpper && lineY <= lowestLower) return true;
+  for (let index = 0; index < points.length - 1; index++) {
+    const start = points[index];
+    const end = points[index + 1];
+    const startPixelX = start.x * plotWidthScale;
+    const startPixelY = start.y * plotHeightScale;
+    const endPixelX = end.x * plotWidthScale;
+    const endPixelY = end.y * plotHeightScale;
+    const circlePixelX = circleX * plotWidthScale;
+    const circlePixelY = circleY * plotHeightScale;
+    const radiusPixels = radius * plotHeightScale;
+    if (
+      pointToSegmentDistance(
+        circlePixelX,
+        circlePixelY,
+        startPixelX,
+        startPixelY,
+        endPixelX,
+        endPixelY,
+      ) <= radiusPixels
+    )
+      return true;
   }
   return false;
 }
@@ -206,10 +133,10 @@ export function findHoveredPlotIndex(
   points: { x: number; y: number }[],
   plotX: number,
   plotY: number,
-  horizontalReach: number,
-  verticalDistance: number,
+  dynamicRadius: number,
   alwaysHover: boolean,
-  averagePointsOverride?: { x: number; y: number }[],
+  plotWidthScale = 1,
+  plotHeightScale = 1,
 ) {
   if (
     plotX < PLOT.left ||
@@ -234,77 +161,18 @@ export function findHoveredPlotIndex(
     else high = mid - 1;
   }
 
-  if (alwaysHover) {
-    return nearestIndex;
-  }
-
-  const averagePoints =
-    averagePointsOverride ?? movingAveragePoints(points);
-  if (!averagePoints.length) return -1;
-
-  if (horizontalReach <= 0) {
-    let segmentIndex = 0;
-    while (
-      segmentIndex < averagePoints.length - 1 &&
-      averagePoints[segmentIndex + 1].x < plotX
-    ) {
-      segmentIndex++;
-    }
-    const left = averagePoints[segmentIndex];
-    const right = averagePoints[Math.min(segmentIndex + 1, averagePoints.length - 1)];
-    const span = right.x - left.x;
-    const ratio = span > 0 ? (plotX - left.x) / span : 0;
-    const averageY = left.y + (right.y - left.y) * ratio;
-    const upperY = Math.max(PLOT.top, averageY - verticalDistance);
-    const lowerY = Math.min(PLOT.bottom, averageY + verticalDistance);
-    return plotY >= upperY && plotY <= lowerY ? nearestIndex : -1;
-  }
-
-  const lineLeft = Math.max(PLOT.left, plotX - horizontalReach);
-  const lineRight = Math.min(PLOT.right, plotX + horizontalReach);
-
-  let firstIndex = 0;
-  low = 0;
-  high = averagePoints.length - 1;
-  while (low <= high) {
-    const mid = (low + high) >> 1;
-    if (averagePoints[mid].x < lineLeft) low = mid + 1;
-    else {
-      firstIndex = mid;
-      high = mid - 1;
-    }
-  }
-
-  for (
-    let index = Math.max(0, firstIndex - 1);
-    index < averagePoints.length - 1;
-    index++
-  ) {
-    const leftPoint = averagePoints[index];
-    const rightPoint = averagePoints[index + 1];
-    if (leftPoint.x > lineRight) break;
-
-    const overlapLeft = Math.max(lineLeft, leftPoint.x);
-    const overlapRight = Math.min(lineRight, rightPoint.x);
-    if (overlapRight < overlapLeft) continue;
-
-    const segmentWidth = rightPoint.x - leftPoint.x;
-    if (segmentWidth <= 0) continue;
-
-    for (const x of [
-      overlapLeft,
-      (overlapLeft + overlapRight) / 2,
-      overlapRight,
-    ]) {
-      const ratio = (x - leftPoint.x) / segmentWidth;
-      const averageY =
-        leftPoint.y + (rightPoint.y - leftPoint.y) * ratio;
-      const upperY = Math.max(PLOT.top, averageY - verticalDistance);
-      const lowerY = Math.min(PLOT.bottom, averageY + verticalDistance);
-      if (plotY >= upperY && plotY <= lowerY) return nearestIndex;
-    }
-  }
-  return -1;
+  if (alwaysHover) return nearestIndex;
+  const radius = (PLOT.height * dynamicRadius) / 100;
+  return circleTouchesPlot(
+    points,
+    plotX,
+    plotY,
+    radius,
+    plotWidthScale,
+    plotHeightScale,
+  )
+    ? nearestIndex
+    : -1;
 }
 
 export function hoverAnchor(

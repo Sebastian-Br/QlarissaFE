@@ -14,13 +14,11 @@ import {
   PLOT,
   clientToPlotX,
   clientToPlotY,
+  circleTouchesPlot,
   findHoveredPlotIndex,
   fullPlotHoverPath,
-  horizontalLineTouchesHoverSurface,
   hoverAnchor,
-  hoverTriggerPath,
   isInsidePlot,
-  movingAveragePoints,
 } from "@/lib/chart/plot";
 import {
   createTimeAxis,
@@ -83,11 +81,10 @@ const PriceSeries = memo(function PriceSeries({
   name,
   path,
   triggerPath,
-  cursorX,
-  cursorY,
-  horizontalReach,
-  showHorizontalEase,
-  horizontalEaseTouches,
+  dynamicRadiusPercent,
+  cursorPixel,
+  showDynamicCircle,
+  dynamicCircleTouches,
   yTicks,
   yearTicks,
   tickLabels,
@@ -96,17 +93,23 @@ const PriceSeries = memo(function PriceSeries({
   name: string;
   path: string;
   triggerPath: string;
-  cursorX: number | null;
-  cursorY: number | null;
-  horizontalReach: number;
-  showHorizontalEase: boolean;
-  horizontalEaseTouches: boolean;
+  dynamicRadiusPercent: number;
+  cursorPixel: { x: number; y: number; chartHeight: number } | null;
+  showDynamicCircle: boolean;
+  dynamicCircleTouches: boolean;
   yTicks: { ratio: number; position: number }[];
   yearTicks: TimeAxis["yearTicks"];
   tickLabels: TimeAxis["tickLabels"];
   selected: { x: number; y: number } | null;
 }) {
+  const circlePixelRadius =
+    cursorPixel
+      ? (cursorPixel.chartHeight - 26) *
+        (PLOT.height / 100) *
+        (dynamicRadiusPercent / 100)
+      : 0;
   return (
+    <>
     <svg
       viewBox="0 0 100 100"
       preserveAspectRatio="none"
@@ -124,20 +127,6 @@ const PriceSeries = memo(function PriceSeries({
       />
       <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
       {triggerPath && <path d={triggerPath} fill="#22c55e" fillOpacity="0.10" />}
-      {showHorizontalEase &&
-        cursorX !== null &&
-        cursorY !== null && (
-          <line
-            x1={Math.max(PLOT.left, cursorX - horizontalReach)}
-            x2={Math.min(PLOT.right, cursorX + horizontalReach)}
-            y1={Math.max(PLOT.top, Math.min(PLOT.bottom, cursorY))}
-            y2={Math.max(PLOT.top, Math.min(PLOT.bottom, cursorY))}
-            stroke={horizontalEaseTouches ? "#22c55e" : "#7dd3fc"}
-            strokeOpacity="0.75"
-            strokeDasharray="2 2"
-            vectorEffect="non-scaling-stroke"
-          />
-        )}
       {selected && (
         <circle
           cx={selected.x}
@@ -149,6 +138,22 @@ const PriceSeries = memo(function PriceSeries({
         />
       )}
     </svg>
+    {showDynamicCircle && cursorPixel && (
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute z-10 rounded-full border border-dashed"
+        style={{
+          left: cursorPixel.x,
+          top: cursorPixel.y,
+          width: circlePixelRadius * 2,
+          height: circlePixelRadius * 2,
+          transform: "translate(-50%, -50%)",
+          borderColor: dynamicCircleTouches ? "#38bdf8" : "#7dd3fc",
+          opacity: dynamicCircleTouches ? 1 : 0.75,
+        }}
+      />
+    )}
+    </>
   );
 });
 
@@ -170,21 +175,22 @@ export function PriceHistoryChart({
   const [logScale, setLogScale] = useState(true);
   const [cardDistance, setCardDistance] = useState(20);
   const [hoverSettings, setHoverSettings] = useState({
-    distance: 5,
-    easing: 5,
+    radius: 2,
   });
-  const hoverDistance = hoverSettings.distance;
-  const hoverEasing = hoverSettings.easing;
+  const dynamicRadius = hoverSettings.radius;
   const [hoverBehavior, setHoverBehavior] =
     useState<HoverBehavior>("dynamic");
-  const [previewHoverBehavior, setPreviewHoverBehavior] =
-    useState<HoverBehavior | null>(null);
   const [cursorPlot, setCursorPlot] = useState<{ x: number; y: number } | null>(
     null,
   );
   const [showSettings, setShowSettings] = useState(false);
   const [selected, setSelected] = useState<PriceHover | null>(null);
   const [chartWidth, setChartWidth] = useState(0);
+  const [cursorPixel, setCursorPixel] = useState<{
+    x: number;
+    y: number;
+    chartHeight: number;
+  } | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -277,11 +283,6 @@ export function PriceHistoryChart({
       })),
     [calendarRange, calendarStart, scale, visibleHistory],
   );
-  const movingAveragePlotPoints = useMemo(
-    () => movingAveragePoints(plotPoints),
-    [plotPoints],
-  );
-
   const path = useMemo(
     () =>
       plotPoints
@@ -318,23 +319,13 @@ export function PriceHistoryChart({
         });
   }, [scale]);
 
-  const horizontalReach = (PLOT.width * hoverEasing) / 100;
-  const effectiveHoverBehavior =
-    previewHoverBehavior ?? hoverBehavior;
-
   const triggerPath = useMemo(() => {
     if (!showSettings) return "";
-    if (effectiveHoverBehavior === "never") return "";
-    if (effectiveHoverBehavior === "always") return fullPlotHoverPath();
-    return hoverTriggerPath(
-      plotPoints,
-      hoverDistance,
-      movingAveragePlotPoints,
-    );
+    if (hoverBehavior === "never") return "";
+    if (hoverBehavior === "always") return fullPlotHoverPath();
+    return "";
   }, [
-    effectiveHoverBehavior,
-    hoverDistance,
-    movingAveragePlotPoints,
+    hoverBehavior,
     plotPoints,
     showSettings,
   ]);
@@ -357,10 +348,10 @@ export function PriceHistoryChart({
         plotPoints,
         cursorX,
         cursorY,
-        horizontalReach,
-        hoverDistance,
+        dynamicRadius,
         hoverBehavior === "always",
-        movingAveragePlotPoints,
+        (box.width - 26) / 100,
+        (box.height - 26) / 100,
       );
       if (plotIndex < 0) return null;
       const plot = plotPoints[plotIndex];
@@ -373,9 +364,7 @@ export function PriceHistoryChart({
     },
     [
       hoverBehavior,
-      horizontalReach,
-      hoverDistance,
-      movingAveragePlotPoints,
+      dynamicRadius,
       plotPoints,
     ],
   );
@@ -405,12 +394,14 @@ export function PriceHistoryChart({
     onPointerLeave: () => {
       pointerHandlers.onPointerLeave();
       setCursorPlot(null);
+      setCursorPixel(null);
     },
     onPointerMove: (event: PointerEvent<HTMLDivElement>) => {
       if (isChartOverlay(event.target)) {
         viewport.pointerPositionRef.current = null;
         setHovered(null);
         setCursorPlot(null);
+        setCursorPixel(null);
         return;
       }
       const box = chartRef.current?.getBoundingClientRect();
@@ -419,28 +410,33 @@ export function PriceHistoryChart({
           x: clientToPlotX(box, event.clientX),
           y: clientToPlotY(box, event.clientY),
         });
+        setCursorPixel({
+          x: event.clientX - box.left,
+          y: event.clientY - box.top,
+          chartHeight: box.height,
+        });
       }
       pointerHandlers.onPointerMove(event);
     },
   };
 
-  const horizontalEaseTouches = useMemo(
-    () =>
-      cursorPlot !== null &&
-      horizontalLineTouchesHoverSurface(
+  const dynamicCircleRadius =
+    (PLOT.height * dynamicRadius) / 100;
+  const dynamicCircleTouches = useMemo(
+    () => {
+      if (!cursorPlot) return false;
+      const chart = chartRef.current?.getBoundingClientRect();
+      if (!chart) return false;
+      return circleTouchesPlot(
         plotPoints,
         cursorPlot.x,
         cursorPlot.y,
-        horizontalReach,
-        hoverDistance,
-        movingAveragePlotPoints,
-      ),
-    [
-      cursorPlot,
-      horizontalReach,
-      hoverDistance,
-      movingAveragePlotPoints,
-    ],
+        dynamicCircleRadius,
+        (chart.width - 26) / 100,
+        (chart.height - 26) / 100,
+      );
+    },
+    [cursorPlot, dynamicCircleRadius, plotPoints],
   );
 
   const hoveredDateKey = hovered?.point.date;
@@ -491,13 +487,11 @@ export function PriceHistoryChart({
             >
               <HoverBehaviorSelector
                 behavior={hoverBehavior}
-                verticalDistance={hoverDistance}
-                horizontalEase={hoverEasing}
+                dynamicRadius={dynamicRadius}
                 onBehaviorChange={setHoverBehavior}
-                onValuesChange={(distance, easing) =>
-                  setHoverSettings({ distance, easing })
+                onDynamicRadiusChange={(radius) =>
+                  setHoverSettings({ radius })
                 }
-                onPreviewBehavior={setPreviewHoverBehavior}
               />
             </ChartSettingsPanel>
           )}
@@ -505,15 +499,10 @@ export function PriceHistoryChart({
             name={security.name}
             path={path}
             triggerPath={triggerPath}
-            cursorX={cursorPlot?.x ?? null}
-            cursorY={cursorPlot?.y ?? null}
-            horizontalReach={horizontalReach}
-            showHorizontalEase={
-              showSettings &&
-              hoverBehavior === "dynamic" &&
-              horizontalReach > 0
-            }
-            horizontalEaseTouches={horizontalEaseTouches}
+            dynamicRadiusPercent={dynamicRadius}
+            cursorPixel={cursorPixel}
+            showDynamicCircle={showSettings && hoverBehavior === "dynamic"}
+            dynamicCircleTouches={dynamicCircleTouches}
             yTicks={yTicks}
             yearTicks={yearTicks}
             tickLabels={tickLabels}

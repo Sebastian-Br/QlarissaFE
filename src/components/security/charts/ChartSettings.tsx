@@ -1,99 +1,21 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type PointerEvent,
-  type ReactNode,
-} from "react";
+import type { ReactNode } from "react";
 import { LineChart, Settings } from "lucide-react";
 
 export type HoverBehavior = "never" | "always" | "dynamic";
 
 export function HoverBehaviorSelector({
   behavior,
-  verticalDistance,
-  horizontalEase,
+  dynamicRadius,
   onBehaviorChange,
-  onValuesChange,
-  onPreviewBehavior,
+  onDynamicRadiusChange,
 }: {
   behavior: HoverBehavior;
-  verticalDistance: number;
-  horizontalEase: number;
+  dynamicRadius: number;
   onBehaviorChange: (behavior: HoverBehavior) => void;
-  onValuesChange: (verticalDistance: number, horizontalEase: number) => void;
-  onPreviewBehavior: (behavior: HoverBehavior | null) => void;
+  onDynamicRadiusChange: (radius: number) => void;
 }) {
-  const mapRef = useRef<HTMLDivElement>(null);
-  const animationFrameRef = useRef<number | null>(null);
-  const latestPointerRef = useRef<{ x: number; y: number } | null>(null);
-  const lastUpdateTimeRef = useRef(0);
-  const [dragging, setDragging] = useState(false);
-  const previewIntervalMs = 1000 / 30;
-
-  useEffect(
-    () => () => {
-      if (animationFrameRef.current !== null) {
-        window.cancelAnimationFrame(animationFrameRef.current);
-      }
-    },
-    [],
-  );
-
-  const updateFromPosition = (clientX: number, clientY: number) => {
-    const map = mapRef.current;
-    if (!map) return;
-    const box = map.getBoundingClientRect();
-    const xRatio = Math.max(0, Math.min(1, (clientX - box.left) / box.width));
-    const yRatio = Math.max(0, Math.min(1, (clientY - box.top) / box.height));
-    const x = xRatio * 8;
-    const y = 30 - yRatio * 29;
-    const nextHorizontalEase = Math.round(x * 10) / 10;
-    const nextVerticalDistance = Math.round(y);
-    if (
-      nextHorizontalEase !== horizontalEase ||
-      nextVerticalDistance !== verticalDistance
-    ) {
-      onValuesChange(nextVerticalDistance, nextHorizontalEase);
-    }
-  };
-
-  const schedulePointerUpdate = (clientX: number, clientY: number) => {
-    latestPointerRef.current = { x: clientX, y: clientY };
-    if (animationFrameRef.current !== null) return;
-    animationFrameRef.current = window.requestAnimationFrame((timestamp) => {
-      animationFrameRef.current = null;
-      if (timestamp - lastUpdateTimeRef.current < previewIntervalMs) {
-        schedulePointerUpdate(
-          latestPointerRef.current?.x ?? clientX,
-          latestPointerRef.current?.y ?? clientY,
-        );
-        return;
-      }
-      lastUpdateTimeRef.current = timestamp;
-      const latestPointer = latestPointerRef.current;
-      if (latestPointer) {
-        updateFromPosition(latestPointer.x, latestPointer.y);
-      }
-    });
-  };
-
-  const startDragging = (event: PointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setDragging(true);
-    event.currentTarget.setPointerCapture(event.pointerId);
-    schedulePointerUpdate(event.clientX, event.clientY);
-  };
-
-  const xRatio = horizontalEase / 8;
-  const yRatio = (30 - verticalDistance) / 29;
-
   return (
-    <div
-      className="grid gap-1.5"
-      onPointerLeave={() => onPreviewBehavior(null)}
-    >
+    <div className="grid gap-1.5">
       <div className="text-xs font-medium text-slate-400">Hover behavior</div>
       <div className="grid overflow-hidden rounded-lg border border-sky-200/15 bg-[#061d32]">
         {(["never", "always"] as const).map((option) => (
@@ -101,8 +23,6 @@ export function HoverBehaviorSelector({
             key={option}
             type="button"
             aria-pressed={behavior === option}
-            onPointerEnter={() => onPreviewBehavior(option)}
-            onPointerLeave={() => onPreviewBehavior(null)}
             onClick={() => onBehaviorChange(option)}
             className={`h-8 text-xs font-semibold capitalize transition-all ${
               behavior === option
@@ -116,8 +36,6 @@ export function HoverBehaviorSelector({
         <button
           type="button"
           aria-pressed={behavior === "dynamic"}
-          onPointerEnter={() => onPreviewBehavior("dynamic")}
-          onPointerLeave={() => onPreviewBehavior(null)}
           onPointerDown={(event) => event.stopPropagation()}
           onClick={() => onBehaviorChange("dynamic")}
           className={`relative block w-full overflow-hidden text-xs font-semibold transition-[height] duration-300 ease-out motion-reduce:transition-none active:scale-100 ${
@@ -130,78 +48,19 @@ export function HoverBehaviorSelector({
             Dynamic
           </span>
           {behavior === "dynamic" && (
-            <div
-              ref={mapRef}
-              role="slider"
-              aria-label="Dynamic hover area"
-              aria-valuemin={1}
-              aria-valuemax={30}
-              aria-valuenow={verticalDistance}
-              aria-valuetext={`${verticalDistance} vertical, ${horizontalEase.toFixed(1)} horizontal`}
-              tabIndex={0}
-              onPointerDown={startDragging}
-              onPointerMove={(event) => {
-                if (dragging) {
-                  schedulePointerUpdate(event.clientX, event.clientY);
+            <div className="absolute bottom-2 left-2 right-2 top-9 grid content-center gap-1.5 text-slate-950">
+              <div className="text-[10px] font-medium">Circle radius ({dynamicRadius.toFixed(0)}%)</div>
+              <input
+                aria-label="Dynamic circle radius"
+                type="range"
+                min="2"
+                max="25"
+                step="1"
+                value={dynamicRadius}
+                onChange={(event) =>
+                  onDynamicRadiusChange(Number(event.target.value))
                 }
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowLeft") {
-                  event.preventDefault();
-                  onValuesChange(
-                    verticalDistance,
-                    Math.max(0, Math.round((horizontalEase - 0.1) * 10) / 10),
-                  );
-                } else if (event.key === "ArrowRight") {
-                  event.preventDefault();
-                  onValuesChange(
-                    verticalDistance,
-                    Math.min(8, Math.round((horizontalEase + 0.1) * 10) / 10),
-                  );
-                } else if (event.key === "ArrowUp") {
-                  event.preventDefault();
-                  onValuesChange(Math.min(30, verticalDistance + 1), horizontalEase);
-                } else if (event.key === "ArrowDown") {
-                  event.preventDefault();
-                  onValuesChange(Math.max(1, verticalDistance - 1), horizontalEase);
-                }
-              }}
-              onPointerUp={(event) => {
-                schedulePointerUpdate(event.clientX, event.clientY);
-                if (animationFrameRef.current !== null) {
-                  window.cancelAnimationFrame(animationFrameRef.current);
-                  animationFrameRef.current = null;
-                }
-                const latestPointer = latestPointerRef.current;
-                if (latestPointer) {
-                  updateFromPosition(latestPointer.x, latestPointer.y);
-                }
-                if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-                  event.currentTarget.releasePointerCapture(event.pointerId);
-                }
-                setDragging(false);
-              }}
-              onPointerCancel={() => {
-                if (animationFrameRef.current !== null) {
-                  window.cancelAnimationFrame(animationFrameRef.current);
-                  animationFrameRef.current = null;
-                }
-                latestPointerRef.current = null;
-                setDragging(false);
-              }}
-              className="absolute bottom-3 left-3 right-3 top-10 touch-none cursor-crosshair border border-sky-300/30 bg-[#061d32]"
-              style={{
-                backgroundImage:
-                  "linear-gradient(to right, rgba(125,211,252,0.10) 1px, transparent 1px), linear-gradient(to bottom, rgba(125,211,252,0.10) 1px, transparent 1px)",
-                backgroundSize: "16.6667% 25%",
-              }}
-            >
-              <div
-                className="pointer-events-none absolute h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-sky-100 bg-sky-400 shadow-[0_0_10px_3px_rgba(56,189,248,0.55)]"
-                style={{
-                  left: `${xRatio * 100}%`,
-                  top: `${yRatio * 100}%`,
-                }}
+                className="h-2 w-full cursor-pointer accent-sky-400"
               />
             </div>
           )}
