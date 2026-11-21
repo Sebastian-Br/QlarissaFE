@@ -40,7 +40,7 @@ export function HoverBehaviorSelector({
           onClick={() => onBehaviorChange("dynamic")}
           className={`relative block w-full overflow-hidden text-xs font-semibold transition-[height] duration-300 ease-out motion-reduce:transition-none active:scale-100 ${
             behavior === "dynamic"
-              ? "h-44 bg-sky-400 text-slate-950"
+              ? "h-20 bg-sky-400 text-slate-950"
               : "h-8 bg-[#061d32] text-slate-300 hover:bg-sky-400/10 hover:text-sky-200"
           }`}
         >
@@ -48,19 +48,18 @@ export function HoverBehaviorSelector({
             Dynamic
           </span>
           {behavior === "dynamic" && (
-            <div className="absolute bottom-2 left-2 right-2 top-9 grid content-center gap-1.5 text-slate-950">
-              <div className="text-[10px] font-medium">Circle radius ({dynamicRadius.toFixed(0)}%)</div>
+            <div className="absolute bottom-2 left-2 right-2 top-9 grid content-center text-slate-950">
               <input
                 aria-label="Dynamic circle radius"
                 type="range"
-                min="2"
-                max="25"
+                min="3"
+                max="30"
                 step="1"
                 value={dynamicRadius}
                 onChange={(event) =>
                   onDynamicRadiusChange(Number(event.target.value))
                 }
-                className="h-2 w-full cursor-pointer accent-sky-400"
+                className="h-2 w-full cursor-pointer accent-[#08243d]"
               />
             </div>
           )}

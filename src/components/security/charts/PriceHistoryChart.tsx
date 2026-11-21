@@ -16,7 +16,6 @@ import {
   clientToPlotY,
   circleTouchesPlot,
   findHoveredPlotIndex,
-  fullPlotHoverPath,
   hoverAnchor,
   isInsidePlot,
 } from "@/lib/chart/plot";
@@ -80,7 +79,6 @@ const isChartOverlay = (target: EventTarget) =>
 const PriceSeries = memo(function PriceSeries({
   name,
   path,
-  triggerPath,
   dynamicRadiusPercent,
   cursorPixel,
   showDynamicCircle,
@@ -92,7 +90,6 @@ const PriceSeries = memo(function PriceSeries({
 }: {
   name: string;
   path: string;
-  triggerPath: string;
   dynamicRadiusPercent: number;
   cursorPixel: { x: number; y: number; chartHeight: number } | null;
   showDynamicCircle: boolean;
@@ -126,7 +123,6 @@ const PriceSeries = memo(function PriceSeries({
         vectorEffect="non-scaling-stroke"
       />
       <ChartTimeTicks yearTicks={yearTicks} tickLabels={tickLabels} />
-      {triggerPath && <path d={triggerPath} fill="#22c55e" fillOpacity="0.10" />}
       {selected && (
         <circle
           cx={selected.x}
@@ -319,17 +315,6 @@ export function PriceHistoryChart({
         });
   }, [scale]);
 
-  const triggerPath = useMemo(() => {
-    if (!showSettings) return "";
-    if (hoverBehavior === "never") return "";
-    if (hoverBehavior === "always") return fullPlotHoverPath();
-    return "";
-  }, [
-    hoverBehavior,
-    plotPoints,
-    showSettings,
-  ]);
-
   const selectedPoint = useMemo(() => {
     if (!selected) return null;
     const plot = plotPoints.find((item) => item.point.id === selected.point.id);
@@ -498,7 +483,6 @@ export function PriceHistoryChart({
           <PriceSeries
             name={security.name}
             path={path}
-            triggerPath={triggerPath}
             dynamicRadiusPercent={dynamicRadius}
             cursorPixel={cursorPixel}
             showDynamicCircle={showSettings && hoverBehavior === "dynamic"}

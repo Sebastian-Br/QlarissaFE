@@ -53,10 +53,6 @@ export function clientToPlotY(box: DOMRect, clientY: number) {
   );
 }
 
-export function fullPlotHoverPath() {
-  return `M ${PLOT.left} ${PLOT.top} H ${PLOT.right} V ${PLOT.bottom} H ${PLOT.left} Z`;
-}
-
 function pointToSegmentDistance(
   pointX: number,
   pointY: number,
