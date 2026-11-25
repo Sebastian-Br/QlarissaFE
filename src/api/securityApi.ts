@@ -1,6 +1,6 @@
 import type { Security } from "@/models/Security";
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 export async function getSecurity(id: number, signal?: AbortSignal): Promise<Security> {
   const token = localStorage.getItem("jwt");

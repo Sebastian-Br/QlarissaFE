@@ -1,10 +1,13 @@
+"use client"
+
 import { useEffect, useState } from "react"
 import { Check, LoaderCircle, X } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { useNavigate } from "react-router-dom"
+
+import { useRouter } from "next/navigation"
 import {
   checkEmailAvailability,
   checkUsernameAvailability,
@@ -65,7 +68,7 @@ export default function UserRegistration() {
   const [passwordStatus, setPasswordStatus] = useState<FieldStatus>("idle")
   const [error, setError] = useState<string | null>(null)
 
-  const navigate = useNavigate()
+  const router = useRouter()
 
   useEffect(() => {
     const controller = new AbortController()
@@ -150,7 +153,7 @@ export default function UserRegistration() {
       Password: password,
     })
     if (res.ok) {
-      navigate("/login")
+      router.push("/login")
     } else {
       const errorText = await res.text()
       setError(errorText || "Registration failed")
@@ -178,7 +181,7 @@ export default function UserRegistration() {
         <Button
           variant="link"
           className="absolute right-6 top-6 h-auto p-0 text-sm font-medium text-sky-300 hover:text-sky-200 hover:no-underline"
-          onClick={() => navigate("/login")}
+          onClick={() => router.push("/login")}
         >
           Sign in
         </Button>

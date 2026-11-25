@@ -123,7 +123,7 @@ export function useLivePrices({
 
     startUnavailableTimer();
     connection = new HubConnectionBuilder()
-      .withUrl(`${import.meta.env.VITE_API_BASE_URL}/hubs/live-prices`, {
+      .withUrl(`${process.env.NEXT_PUBLIC_API_BASE_URL}/hubs/live-prices`, {
         accessTokenFactory: () => {
           const token = getUsableJwt();
           if (!token) throw new Error("A valid sign-in token is required.");

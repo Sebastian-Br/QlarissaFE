@@ -3,9 +3,12 @@
 ## Project Context
 
 - **Purpose:** This is the Front-End of a financial analysis platform.
-- **Framework:** React
+- **Framework:** Next.js App Router with React
 - **Language:** TypeScript
-- **Build tool:** Vite
+- **Build/runtime:** Next.js Node.js server (`next dev`, `next build`, `next start`)
+- **Routes:** `src/app/` owns `/`, `/login`, `/register`, `/dashboard`, and `/security/[id]`.
+- **Client behavior:** Screens using browser state, localStorage, SignalR, or interactive hooks must remain client-side; keep `"use client"` boundaries on their entry components.
+- **API configuration:** `NEXT_PUBLIC_API_BASE_URL` is exposed in the browser bundle by Next.js; keep it limited to the API base URL, never secrets. Retain the existing API paths, request payloads, and JWT localStorage behavior.
 - **Project-specific vocabulary:** "Security" generally refers to a financial security.
 A data point generally refers to a point in the daily price history graph, containing Open/Close/High/Low/Average values. 
 - **Back-End:** The Back-End is an ASP.NET Core Server outside this repository.
@@ -46,6 +49,8 @@ When presented with an endpoint, keep in mind that "Async" suffixes are not part
 
 ## Code Organization
 
+- `src/app/`: App Router route entries and the shared root layout/global stylesheet.
+- `src/components/`: interactive login, registration, dashboard, and security-detail experiences. Route navigation uses `next/link` and `next/navigation`.
 * `src/components/SecurityDetail.tsx`: security page. Owns route params, the security load effect, and the update action; composes the modules below.
 * `src/components/security/charts/`: `PriceHistoryChart` (daily prices, log/linear, live-price date), `DividendPayoutChart` (dividend bars). `ChartFrame.tsx` (surface, grid, tick and axis labels), `ChartHover.tsx` (crosshair and hover cards), `ChartSettings.tsx` (settings button and panel) are shared by both.
 * `src/components/security/watchlist/`: star toggles, add-to-watchlist menu, create dialog, tracked-duration input. `WatchlistControls.tsx` composes them from the `useSecurityWatchlists` state.

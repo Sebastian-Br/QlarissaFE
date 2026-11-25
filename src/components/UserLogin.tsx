@@ -1,4 +1,6 @@
-import { useNavigate } from "react-router-dom"
+"use client"
+
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { loginAsUser } from "@/api/accountApi"
 
@@ -8,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
 
 export default function UserRegistration() {
-  const navigate = useNavigate()
+  const router = useRouter()
 
   const [username, setUsername] = useState("")
   const [password, setPassword] = useState("")
@@ -19,7 +21,7 @@ export default function UserRegistration() {
       if (res.ok) {
         const token = await res.text();
         localStorage.setItem("jwt", token);
-        navigate("/dashboard")
+        router.push("/dashboard")
       } else {
         const errorText = await res.text()
         setError(errorText || "Login failed")
@@ -32,7 +34,7 @@ export default function UserRegistration() {
         <Button
           variant="link"
           className="absolute right-6 top-6 h-auto p-0 text-sm font-medium text-sky-300 hover:text-sky-200 hover:no-underline"
-          onClick={() => navigate("/register")}
+          onClick={() => router.push("/register")}
         >
           Create account
         </Button>

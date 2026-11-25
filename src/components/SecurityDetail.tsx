@@ -1,6 +1,10 @@
+"use client";
+
 import { useEffect, useState } from "react";
 import { ArrowLeft, Info, RefreshCw } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+
+import Link from "next/link";
+import { useParams } from "next/navigation";
 import { getSecurity, updateSecurity } from "@/api/securityApi";
 import { DividendPayoutChart } from "@/components/security/charts/DividendPayoutChart";
 import { PriceHistoryChart } from "@/components/security/charts/PriceHistoryChart";
@@ -18,7 +22,7 @@ import {
 } from "@/models/Security";
 
 export default function SecurityDetail() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const securityId = Number(id);
   const [security, setSecurity] = useState<Security | null>(null);
   const [graphHistory, setGraphHistory] = useState<DailyPrice[]>([]);
@@ -80,13 +84,13 @@ export default function SecurityDetail() {
       >
         <header className="flex items-center justify-between border-b border-sky-100/10 pb-6">
           <Link
-            to="/dashboard"
+            href="/dashboard"
             className="text-2xl font-bold tracking-tight text-white"
           >
             Qlarissa<span className="text-sky-400">.</span>
           </Link>
           <Link
-            to="/dashboard"
+            href="/dashboard"
             className="inline-flex items-center gap-2 rounded-xl border border-sky-200/15 px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
           >
             <ArrowLeft size={16} />

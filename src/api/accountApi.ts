@@ -1,6 +1,6 @@
 import type { RegisterUserRequest } from "../models/RegisterUserRequest";
 import type { UserLoginRequest } from "../models/UserLoginRequest";
-const BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // Replace these paths with the backend availability endpoints when they are available.
 export const USERNAME_AVAILABILITY_ENDPOINT = "/api/Account/CheckUsernameAvailability";
