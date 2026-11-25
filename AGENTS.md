@@ -7,7 +7,7 @@
 - **Language:** TypeScript
 - **Build/runtime:** Next.js Node.js server (`next dev`, `next build`, `next start`)
 - **Routes:** `src/app/` owns `/`, `/login`, `/register`, `/dashboard`, and `/security/[id]`.
-- **Client behavior:** Screens using browser state, localStorage, SignalR, or interactive hooks must remain client-side; keep `"use client"` boundaries on their entry components.
+- **Rendering:** All application screens are loaded through `src/app/ClientRoute.tsx` with `next/dynamic` and `ssr: false`; preserve this client-only UI boundary. Next.js still serves routes, metadata, assets, and client bundles.
 - **API configuration:** `NEXT_PUBLIC_API_BASE_URL` is exposed in the browser bundle by Next.js; keep it limited to the API base URL, never secrets. Retain the existing API paths, request payloads, and JWT localStorage behavior.
 - **Project-specific vocabulary:** "Security" generally refers to a financial security.
 A data point generally refers to a point in the daily price history graph, containing Open/Close/High/Low/Average values. 

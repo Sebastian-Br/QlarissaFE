@@ -1,5 +1,5 @@
-import SecurityDetail from "@/components/SecurityDetail";
+import { ClientRoute } from "../../ClientRoute";
 
 export default function SecurityPage() {
-  return <SecurityDetail />;
+  return <ClientRoute route="security" />;
 }

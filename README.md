@@ -1,6 +1,6 @@
 # Qlarissa Frontend
 
-The Qlarissa frontend is a React and TypeScript application built with the Next.js App Router. Interactive screens remain client-rendered so browser-local JWT authentication, SignalR live prices, chart controls, and watchlist behavior continue to work as before.
+The Qlarissa frontend is a React and TypeScript application built with the Next.js App Router. All application screens are loaded client-side without server-rendering the UI, so browser-local JWT authentication, SignalR live prices, chart controls, and watchlist behavior continue to run in the browser. The Next.js Node.js server still handles routing and serves the application assets and JavaScript bundles.
 
 ## Requirements
 

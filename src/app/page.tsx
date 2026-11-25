@@ -1,5 +1,5 @@
-import UserLogin from "@/components/UserLogin";
+import { ClientRoute } from "./ClientRoute";
 
 export default function HomePage() {
-  return <UserLogin />;
+  return <ClientRoute route="login" />;
 }

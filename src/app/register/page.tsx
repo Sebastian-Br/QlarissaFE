@@ -1,5 +1,5 @@
-import UserRegistration from "@/components/UserRegistration";
+import { ClientRoute } from "../ClientRoute";
 
 export default function RegisterPage() {
-  return <UserRegistration />;
+  return <ClientRoute route="register" />;
 }
