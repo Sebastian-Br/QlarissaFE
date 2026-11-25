@@ -30,23 +30,21 @@ export async function checkEmailAvailability(email: string, signal?: AbortSignal
 
 
 export async function registerUser(data: RegisterUserRequest): Promise<Response> {
-  let result = fetch(`${BASE_URL}/api/Account/Register`, {
+  return fetch(`${BASE_URL}/api/Account/Register`, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
     "accept": "*/*"
   },
   body: JSON.stringify(data)});
-  return result;
 }
 
 export async function loginAsUser(data: UserLoginRequest): Promise<Response> {
-  let result = fetch(`${BASE_URL}/api/Account/Login`, {
+  return fetch(`${BASE_URL}/api/Account/Login`, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
     "accept": "*/*"
   },
   body: JSON.stringify(data)});
-  return result;
 }
