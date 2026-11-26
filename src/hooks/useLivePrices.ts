@@ -11,30 +11,9 @@ import {
   type LivePrice,
 } from "@/lib/livePrices";
 import type { DailyPrice, Security } from "@/models/Security";
+import { getAccessTokenForSignalR } from "@/api/authenticatedFetch";
 
 const UNAVAILABLE_AFTER_MS = 30_000;
-
-function getUsableJwt() {
-  const token = localStorage.getItem("jwt");
-  if (!token) return null;
-
-  try {
-    const payload = token.split(".")[1];
-    if (!payload) return null;
-
-    const base64 = payload.replace(/-/g, "+").replace(/_/g, "/");
-    const bytes = Uint8Array.from(
-      atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, "=")),
-      (character) => character.charCodeAt(0),
-    );
-    const claims: { exp?: unknown } = JSON.parse(new TextDecoder().decode(bytes));
-    return typeof claims.exp !== "number" || claims.exp > Date.now() / 1000
-      ? token
-      : null;
-  } catch {
-    return null;
-  }
-}
 
 export function useLivePrices({
   security,
@@ -114,21 +93,10 @@ export function useLivePrices({
       if (snapshot) handleSnapshot(snapshot);
     };
 
-    if (!getUsableJwt()) {
-      setLiveUpdatesUnavailable(true);
-      return () => {
-        disposed = true;
-      };
-    }
-
     startUnavailableTimer();
     connection = new HubConnectionBuilder()
       .withUrl(`${process.env.NEXT_PUBLIC_API_BASE_URL}/hubs/live-prices`, {
-        accessTokenFactory: () => {
-          const token = getUsableJwt();
-          if (!token) throw new Error("A valid sign-in token is required.");
-          return token;
-        },
+        accessTokenFactory: getAccessTokenForSignalR,
       })
       .withAutomaticReconnect()
       .configureLogging(LogLevel.Warning)

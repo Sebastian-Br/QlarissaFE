@@ -1,4 +1,5 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+import { authenticatedFetch } from "./authenticatedFetch";
 
 export interface SearchResult {
   id?: number | null;
@@ -10,13 +11,11 @@ export interface SearchResult {
 }
 
 async function search(endpoint: string, userQuery: string, signal: AbortSignal): Promise<SearchResult[]> {
-  const token = localStorage.getItem("jwt");
-  const response = await fetch(`${BASE_URL}${endpoint}?userQuery=${encodeURIComponent(userQuery)}`, {
+  const response = await authenticatedFetch(`${BASE_URL}${endpoint}?userQuery=${encodeURIComponent(userQuery)}`, {
     method: "GET",
     signal,
     headers: {
       accept: "application/json",
-      Authorization: `Bearer ${token}`,
     },
   });
 
@@ -44,13 +43,11 @@ export function searchSecuritiesExternally(userQuery: string, signal: AbortSigna
 }
 
 export async function addSecurity(tickerSymbol: string, signal: AbortSignal): Promise<string> {
-  const token = localStorage.getItem("jwt");
-  const response = await fetch(`${BASE_URL}/api/Security/Add?tickerSymbol=${encodeURIComponent(tickerSymbol)}`, {
+  const response = await authenticatedFetch(`${BASE_URL}/api/Security/Add?tickerSymbol=${encodeURIComponent(tickerSymbol)}`, {
     method: "POST",
     signal,
     headers: {
       accept: "application/json",
-      Authorization: `Bearer ${token}`,
     },
   });
 

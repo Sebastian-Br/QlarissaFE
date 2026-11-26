@@ -50,8 +50,10 @@ import {
   ChartSettingsPanel,
   HoverBehaviorSelector,
   type ChartSettingsLabels,
-  type HoverBehavior,
 } from "./ChartSettings";
+import { useDeviceProfile, useDisplaySetting } from "@/hooks/useDisplaySetting";
+import { useGraphSettings } from "@/hooks/useGraphSettings";
+import { GraphDataSource } from "@/models/GraphSettings";
 
 const priceChartLabels: ChartSettingsLabels = {
   startDate: "Chart start date",
@@ -166,16 +168,15 @@ export function PriceHistoryChart({
     () => [...priceHistory].sort((a, b) => a.date.localeCompare(b.date)),
     [priceHistory],
   );
+  const profile = useDeviceProfile();
+  const [logScale, setLogScale] = useDisplaySetting(profile, "chart.security.logScale");
+  const [cardDistance, setCardDistance] = useDisplaySetting(profile, "chart.security.cardDistance");
+  const [hoverBehavior, setHoverBehavior] = useDisplaySetting(profile, "chart.security.hover.behavior");
+  const [dynamicRadius, setDynamicRadius] = useDisplaySetting(profile, "chart.security.hover.dynamicRadius");
+  const graphSettings = useGraphSettings(GraphDataSource.Security);
+  const graphSettingsHydrated = useRef(false);
   const [startDate, setStartDate] = useState(history[0]?.date ?? "");
   const [endDate, setEndDate] = useState(history.at(-1)?.date ?? "");
-  const [logScale, setLogScale] = useState(true);
-  const [cardDistance, setCardDistance] = useState(20);
-  const [hoverSettings, setHoverSettings] = useState({
-    radius: 2,
-  });
-  const dynamicRadius = hoverSettings.radius;
-  const [hoverBehavior, setHoverBehavior] =
-    useState<HoverBehavior>("dynamic");
   const [cursorPlot, setCursorPlot] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -188,6 +189,13 @@ export function PriceHistoryChart({
     chartHeight: number;
   } | null>(null);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!graphSettings.ready || graphSettingsHydrated.current) return;
+    graphSettingsHydrated.current = true;
+    setStartDate(graphSettings.settings.bounds?.startDate ?? history[0]?.date ?? "");
+    setEndDate(graphSettings.settings.bounds?.endDate ?? history.at(-1)?.date ?? "");
+  }, [graphSettings.ready, graphSettings.settings.bounds, history]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -462,21 +470,31 @@ export function PriceHistoryChart({
               onStartDateChange={(value) => {
                 setStartDate(value);
                 setPan(0);
+                graphSettings.updateBounds({
+                  startDate: value || null,
+                  endDate: graphSettings.settings.bounds?.endDate ?? (endDate || null),
+                  start: graphSettings.settings.bounds?.start ?? null,
+                  end: graphSettings.settings.bounds?.end ?? null,
+                });
               }}
               onEndDateChange={(value) => {
                 setEndDate(value);
                 setPan(0);
+                graphSettings.updateBounds({
+                  startDate: graphSettings.settings.bounds?.startDate ?? (startDate || null),
+                  endDate: value || null,
+                  start: graphSettings.settings.bounds?.start ?? null,
+                  end: graphSettings.settings.bounds?.end ?? null,
+                });
               }}
               onCardDistanceChange={setCardDistance}
-              onLogScaleToggle={() => setLogScale((current) => !current)}
+              onLogScaleToggle={() => setLogScale(!logScale)}
             >
               <HoverBehaviorSelector
                 behavior={hoverBehavior}
                 dynamicRadius={dynamicRadius}
                 onBehaviorChange={setHoverBehavior}
-                onDynamicRadiusChange={(radius) =>
-                  setHoverSettings({ radius })
-                }
+                onDynamicRadiusChange={setDynamicRadius}
               />
             </ChartSettingsPanel>
           )}

@@ -33,6 +33,9 @@ import {
   ChartSettingsPanel,
   type ChartSettingsLabels,
 } from "./ChartSettings";
+import { useDeviceProfile, useDisplaySetting } from "@/hooks/useDisplaySetting";
+import { useGraphSettings } from "@/hooks/useGraphSettings";
+import { GraphDataSource } from "@/models/GraphSettings";
 
 const dividendChartLabels: ChartSettingsLabels = {
   startDate: "Dividend chart start date",
@@ -56,6 +59,11 @@ export function DividendPayoutChart({
     () => [...payouts].sort((a, b) => a.payoutDate.localeCompare(b.payoutDate)),
     [payouts],
   );
+  const profile = useDeviceProfile();
+  const [logScale, setLogScale] = useDisplaySetting(profile, "chart.dividendPayouts.logScale");
+  const [cardDistance, setCardDistance] = useDisplaySetting(profile, "chart.dividendPayouts.cardDistance");
+  const graphSettings = useGraphSettings(GraphDataSource.DividendPayouts);
+  const graphSettingsHydrated = useRef(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [startDate, setStartDate] = useState(
     history[0]?.payoutDate.slice(0, 10) ?? "",
@@ -63,11 +71,24 @@ export function DividendPayoutChart({
   const [endDate, setEndDate] = useState(
     history.at(-1)?.payoutDate.slice(0, 10) ?? "",
   );
-  const [logScale, setLogScale] = useState(true);
-  const [cardDistance, setCardDistance] = useState(10);
   const [showSettings, setShowSettings] = useState(false);
   const [chartWidth, setChartWidth] = useState(0);
   const chartRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!graphSettings.ready || graphSettingsHydrated.current) return;
+    graphSettingsHydrated.current = true;
+    setStartDate(
+      graphSettings.settings.bounds?.startDate ??
+        history[0]?.payoutDate.slice(0, 10) ??
+        "",
+    );
+    setEndDate(
+      graphSettings.settings.bounds?.endDate ??
+        history.at(-1)?.payoutDate.slice(0, 10) ??
+        "",
+    );
+  }, [graphSettings.ready, graphSettings.settings.bounds, history]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -198,13 +219,28 @@ export function DividendPayoutChart({
               onStartDateChange={(value) => {
                 setStartDate(value);
                 setPan(0);
+                graphSettings.updateBounds({
+                  startDate: value || null,
+                  endDate:
+                    graphSettings.settings.bounds?.endDate ?? (endDate || null),
+                  start: graphSettings.settings.bounds?.start ?? null,
+                  end: graphSettings.settings.bounds?.end ?? null,
+                });
               }}
               onEndDateChange={(value) => {
                 setEndDate(value);
                 setPan(0);
+                graphSettings.updateBounds({
+                  startDate:
+                    graphSettings.settings.bounds?.startDate ??
+                    (startDate || null),
+                  endDate: value || null,
+                  start: graphSettings.settings.bounds?.start ?? null,
+                  end: graphSettings.settings.bounds?.end ?? null,
+                });
               }}
               onCardDistanceChange={setCardDistance}
-              onLogScaleToggle={() => setLogScale((current) => !current)}
+              onLogScaleToggle={() => setLogScale(!logScale)}
             />
           )}
           {visiblePayouts.length > 0 ? (

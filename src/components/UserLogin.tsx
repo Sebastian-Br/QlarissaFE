@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation"
 import { useState } from "react"
 import { loginAsUser } from "@/api/accountApi"
+import { setAccessToken } from "@/api/authenticatedFetch"
 
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,8 +20,16 @@ export default function UserRegistration() {
   async function handleLogin() {
       const res = await loginAsUser({ username, password })
       if (res.ok) {
-        const token = await res.text();
-        localStorage.setItem("jwt", token);
+        const result: unknown = await res.json();
+        const token =
+          typeof result === "object" &&
+          result !== null &&
+          "accessToken" in result &&
+          typeof result.accessToken === "string"
+            ? result.accessToken
+            : null;
+        if (!token) throw new Error("Login response did not contain an access token.");
+        setAccessToken(token);
         router.push("/dashboard")
       } else {
         const errorText = await res.text()

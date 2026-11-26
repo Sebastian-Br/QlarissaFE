@@ -1,5 +1,6 @@
 import type { RegisterUserRequest } from "../models/RegisterUserRequest";
 import type { UserLoginRequest } from "../models/UserLoginRequest";
+import { clearAccessToken } from "./authenticatedFetch";
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
 // Replace these paths with the backend availability endpoints when they are available.
@@ -32,6 +33,7 @@ export async function checkEmailAvailability(email: string, signal?: AbortSignal
 export async function registerUser(data: RegisterUserRequest): Promise<Response> {
   return fetch(`${BASE_URL}/api/Account/Register`, {
   method: "POST",
+  credentials: "include",
   headers: {
     "Content-Type": "application/json",
     "accept": "*/*"
@@ -42,9 +44,21 @@ export async function registerUser(data: RegisterUserRequest): Promise<Response>
 export async function loginAsUser(data: UserLoginRequest): Promise<Response> {
   return fetch(`${BASE_URL}/api/Account/Login`, {
   method: "POST",
+  credentials: "include",
   headers: {
     "Content-Type": "application/json",
     "accept": "*/*"
   },
   body: JSON.stringify(data)});
+}
+
+export async function logoutUser(): Promise<void> {
+  try {
+    await fetch(`${BASE_URL}/api/Account/Logout`, {
+      method: "POST",
+      credentials: "include",
+    });
+  } finally {
+    clearAccessToken(true);
+  }
 }
