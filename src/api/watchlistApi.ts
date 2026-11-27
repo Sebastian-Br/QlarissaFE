@@ -1,4 +1,5 @@
 import type { WatchlistMinimal } from "@/models/WatchlistMinimal";
+import type { Watchlist } from "@/models/Watchlist";
 import { authenticatedFetch } from "./authenticatedFetch";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
@@ -13,6 +14,46 @@ export async function getWatchlistsMinimal(): Promise<WatchlistMinimal[]> {
   if (!response.ok) throw new Error("Unable to load watchlists.");
 
   return response.json();
+}
+
+export async function getPinnedWatchlists(
+  signal?: AbortSignal,
+  expectedSubject?: string,
+): Promise<Watchlist[]> {
+  const response = await authenticatedFetch(
+    `${BASE_URL}/api/Watchlist/GetPinnedWatchlists`,
+    {
+      signal,
+      headers: {
+        accept: "application/json",
+      },
+    },
+    expectedSubject,
+  );
+
+  if (!response.ok) throw new Error("Unable to load pinned watchlists.");
+
+  return response.json();
+}
+
+export async function updatePinnedWatchlistOrder(
+  orderedIds: number[],
+  expectedSubject?: string,
+): Promise<void> {
+  const response = await authenticatedFetch(
+    `${BASE_URL}/api/Watchlist/UpdatePinnedWatchlistOrder`,
+    {
+      method: "PUT",
+      headers: {
+        accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(orderedIds),
+    },
+    expectedSubject,
+  );
+
+  if (!response.ok) throw new Error("Unable to save pinned watchlist order.");
 }
 
 export async function updateWatchlist(watchlist: WatchlistMinimal): Promise<WatchlistMinimal> {

@@ -59,3 +59,14 @@ When presented with an endpoint, keep in mind that "Async" suffixes are not part
 * `src/hooks/`: `useChartViewport` (zoom, pan, wheel), `useChartPointer` (hover, drag, click), `useLivePrices` (SignalR subscription and unavailable timer), `useSecurityWatchlists` (watchlist loading, star toggles, saves).
 * `src/lib/formatting.ts`: number, date, and price formatters, and security type labels. `src/lib/livePrices.ts`: live-price type and merge into daily history. `src/lib/chart/`: `plot.ts` (chart coordinate space and hover anchors) and `timeAxis.ts` (calendar scale, year and month ticks, label collision rules).
 * Pure calculations belong in `src/lib`, stateful behavior in `src/hooks`, and markup in components.
+
+
+<!-- BEGIN:nextjs-agent-rules -->
+
+## This is NOT the Next.js you know
+
+This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` (resolved from this file's directory; in monorepos the `next` package may not be visible from the repo root) before writing any code. Heed deprecation notices.
+
+This block is written and re-added by `next dev` — verify at `node_modules/next/dist/server/lib/generate-agent-files.js`. Removing it from a diff only re-creates the uncommitted change; committing it with your work keeps the tree clean.
+
+<!-- END:nextjs-agent-rules -->

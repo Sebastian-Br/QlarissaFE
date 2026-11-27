@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ArrowDown, ArrowRight, ArrowUp, ArrowUpRight, BarChart3, BriefcaseBusiness, ChevronDown, Eye, Lock, Search, TrendingUp, Unlock } from "lucide-react";
+import { ArrowRight, ArrowUpRight, BriefcaseBusiness, ChevronDown, Eye, Lock, Search, TrendingUp, Unlock } from "lucide-react";
 import Link from "next/link";
 import { addSecurity, searchSecuritiesExternally, searchSecuritiesInternally, type SearchResult } from "@/api/dashboardApi";
+import PinnedWatchlistsStack from "@/components/PinnedWatchlistsStack";
+import MovementSignal from "@/components/MovementSignal";
 
 interface Mover {
   symbol: string;
@@ -11,20 +13,6 @@ interface Mover {
   price: string;
   change: number;
 }
-
-const marketWinners: Mover[] = [
-  { symbol: "NVDA", name: "NVIDIA Corporation", price: "$875.28", change: 0.82 },
-  { symbol: "TSLA", name: "Tesla, Inc.", price: "$193.57", change: 2.91 },
-  { symbol: "AMD", name: "Advanced Micro Devices", price: "$168.12", change: 5.25 },
-  { symbol: "SHOP", name: "Shopify Inc.", price: "$76.84", change: 7.00 },
-];
-
-const marketLosers: Mover[] = [
-  { symbol: "DIS", name: "The Walt Disney Company", price: "$111.36", change: -1.72 },
-  { symbol: "PFE", name: "Pfizer Inc.", price: "$27.43", change: -4.41 },
-  { symbol: "INTC", name: "Intel Corporation", price: "$42.19", change: -8.65 },
-  { symbol: "BABA", name: "Alibaba Group", price: "$72.09", change: -12.80 },
-];
 
 const holdingWinners: Mover[] = [
   { symbol: "MSFT", name: "Microsoft Corporation", price: "$418.47", change: 3.46 },
@@ -93,19 +81,6 @@ function UnknownSecurityResult({ result, isAdding, onAdd }: { result: SearchResu
       </div>
     </div>
   );
-}
-
-function MovementSignal({ mover, compact = false }: { mover: Mover; compact?: boolean }) {
-  const positive = mover.change > 0;
-  const magnitude = Math.abs(mover.change);
-  const isHighMovement = magnitude >= 7;
-  const angle = Math.min((magnitude / 7) * 90, 90);
-  const FlyingArrow = positive ? ArrowUp : ArrowDown;
-  const StaticArrow = compact || isHighMovement ? FlyingArrow : ArrowRight;
-  const flyingArrowCount = Math.min(2 + Math.floor(Math.max(0, magnitude - 7) / 4), 4);
-  const flyingArrowDuration = Math.max(0.9, 2.1 - Math.max(0, magnitude - 7) * 0.08);
-
-  return <span className={`flex items-center justify-center gap-0.5 font-semibold ${positive ? "text-emerald-400" : "text-rose-400"}`}><span className={`relative grid place-items-center ${compact ? "h-9 w-9" : "h-5 w-5"}`}><StaticArrow size={compact ? 24 : 15} strokeWidth={compact ? 2.5 : 2} style={!compact && !isHighMovement ? { transform: `rotate(${positive ? -angle : angle}deg)` } : undefined} />{(compact || isHighMovement) && Array.from({ length: flyingArrowCount }, (_, index) => <FlyingArrow key={index} size={compact ? 19 : 14} strokeWidth={2.5} className={`pointer-events-none absolute ${positive ? "movement-arrow-fly-up" : "movement-arrow-fly-down"}`} style={{ left: `${(index - (flyingArrowCount - 1) / 2) * (compact ? 6 : 5)}px`, animationDelay: `${index * (flyingArrowDuration / flyingArrowCount)}s`, animationDuration: `${flyingArrowDuration}s` }} />)}</span>{!compact && `${magnitude.toFixed(2)}%`}</span>;
 }
 
 function MoversCard({ title, icon: Icon, winners, losers, side }: { title: string; icon: typeof TrendingUp; winners: Mover[]; losers: Mover[]; side: "left" | "right" }) {
@@ -241,7 +216,7 @@ export default function Dashboard() {
         </header>
 
         <section className="grid gap-5 py-8 xl:grid-cols-[1fr_1.45fr_1fr]">
-          <MoversCard title="Daily watch list" icon={BarChart3} winners={marketWinners} losers={marketLosers} side="left" />
+          <PinnedWatchlistsStack />
           <div className="xl:order-3 xl:flex xl:justify-end"><MoversCard title="Your holdings" icon={BriefcaseBusiness} winners={holdingWinners} losers={holdingLosers} side="right" /></div>
           <section className="order-2 rounded-2xl border border-sky-200/10 bg-slate-900/60 p-7 shadow-xl shadow-slate-950/20 xl:row-span-1"><div><h2 className="font-semibold text-slate-100">Holdings</h2></div><div className="relative mx-auto my-8 h-72 w-72"><svg viewBox="0 0 100 100" className="h-full w-full -rotate-90" role="img" aria-label="Holdings allocation chart">{(() => { let offset = 0; return holdingAllocation.map((holding) => { const currentOffset = offset; offset += holding.value; return <circle key={holding.symbol} cx="50" cy="50" r="37" fill="none" stroke={holding.color} strokeWidth="20" pathLength="100" strokeDasharray={`${holding.value} ${100 - holding.value}`} strokeDashoffset={-currentOffset} className={`cursor-pointer transition-opacity duration-200 ${hoveredHolding && hoveredHolding.symbol !== holding.symbol ? "opacity-35" : "opacity-100"}`} onMouseEnter={() => setHoveredHolding(holding)} onMouseLeave={() => setHoveredHolding(null)} />; }); })()}</svg><div className="pointer-events-none absolute inset-0 grid place-items-center rounded-full"><div className="grid h-48 w-48 place-items-center rounded-full bg-[#08243d] text-center"><p className="text-2xl font-semibold text-white">$24,860.40</p><p className="mt-2 flex items-center justify-center gap-1 !text-xs font-medium text-emerald-400"><ArrowUpRight size={14} />$438.20 (1.79%)</p></div></div>{hoveredHolding && <div className="pointer-events-none absolute left-1/2 top-0 z-10 -translate-x-1/2 -translate-y-1/2 rounded-lg border border-sky-200/20 bg-[#08243d] px-3 py-2 text-center shadow-xl"><p className="whitespace-nowrap !text-xs font-semibold text-white">{hoveredHolding.name}</p><p className="mt-0.5 !text-xs text-sky-300">{hoveredHolding.value}%</p></div>}<div className="mt-2 space-y-3">{holdingAllocation.slice(0, 5).map((holding) => <div key={holding.symbol} className="flex items-center gap-3"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: holding.color }} /><span className="min-w-0 flex-1 truncate !text-sm text-slate-300">{holding.name}</span><span className="!text-sm font-medium text-slate-100">{holding.value}%</span></div>)}</div></div></section>
         </section>
