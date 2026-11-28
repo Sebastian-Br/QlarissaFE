@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  History,
   Lock,
   RefreshCw,
   Unlock,
@@ -25,6 +26,7 @@ import {
   getAccessTokenForSignalR,
 } from "@/api/authenticatedFetch";
 import MovementSignal from "@/components/MovementSignal";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   getPinnedWatchlists,
   updatePinnedWatchlistOrder,
@@ -84,21 +86,21 @@ function CollapsedFace({
       }
     >
       <div className="pinned-watchlist-movement flex shrink-0 flex-col items-center gap-1">
+        {winner && <MovementSignal mover={winner} compact />}
         <span className="max-w-[72px] truncate text-xs font-semibold text-emerald-300">
           {winner?.symbol ?? "—"}
         </span>
-        {winner && <MovementSignal mover={winner} compact />}
       </div>
       <span
-        className={`whitespace-nowrap text-sm font-bold tracking-[0.12em] text-slate-200 [text-orientation:upright] [writing-mode:vertical-rl] ${measure ? "" : "min-h-0 overflow-hidden"}`}
+        className={`whitespace-nowrap text-base font-bold tracking-[0.12em] text-slate-200 [text-orientation:upright] [writing-mode:vertical-rl] ${measure ? "" : "min-h-0 overflow-hidden"}`}
       >
         {watchlist.name}
       </span>
       <div className="pinned-watchlist-movement flex shrink-0 flex-col items-center gap-1">
-        {loser && <MovementSignal mover={loser} compact />}
         <span className="max-w-[72px] truncate text-xs font-semibold text-rose-300">
           {loser?.symbol ?? "—"}
         </span>
+        {loser && <MovementSignal mover={loser} compact />}
       </div>
     </div>
   );
@@ -767,14 +769,28 @@ export default function PinnedWatchlistsStack() {
                 }`}
               >
                 <header className="pinned-watchlist-header mb-5 flex min-w-0 shrink-0 items-center gap-3">
-                  <div className="min-w-0 flex-1">
-                    <h2 className="truncate text-base font-semibold text-slate-100">
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <h2 className="min-w-0 truncate text-base font-semibold text-slate-100">
                       {watchlist.name}
                     </h2>
-                    <p className="pinned-watchlist-subtitle mt-1 text-sm text-slate-400">
-                      Tracks changes over {watchlist.trackedChangeDurationTradingDays} trading{" "}
-                      {watchlist.trackedChangeDurationTradingDays === 1 ? "day" : "days"}
-                    </p>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <p className="pinned-watchlist-subtitle inline-flex shrink-0 cursor-help items-center gap-1.5 text-sm text-slate-400 transition-colors duration-200 hover:text-slate-200">
+                          <History size={15} aria-hidden="true" />
+                          <span className="font-medium">{watchlist.trackedChangeDurationTradingDays}</span>
+                          <span className="sr-only">
+                            {watchlist.trackedChangeDurationTradingDays === 1 ? "trading day" : "trading days"}
+                          </span>
+                        </p>
+                      </TooltipTrigger>
+                      <TooltipContent
+                        side="top"
+                        className="max-w-72 border border-sky-200/15 bg-slate-800 text-slate-100 shadow-xl"
+                      >
+                        Tracks changes over {watchlist.trackedChangeDurationTradingDays} trading{" "}
+                        {watchlist.trackedChangeDurationTradingDays === 1 ? "day" : "days"}.
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                   <button
                     type="button"
