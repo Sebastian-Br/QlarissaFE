@@ -33,16 +33,18 @@ export function rankWatchlistMovers(
   watchlist: Watchlist,
   prices: ReadonlyMap<string, LivePrice>,
   limit: number,
-): { winners: WatchlistMover[]; losers: WatchlistMover[]; validPriceCount: number } {
+): { winners: WatchlistMover[]; losers: WatchlistMover[]; validPriceCount: number; hasMissingLivePrices: boolean } {
+  let hasMissingLivePrices = false;
   const movers = watchlist.watchedSecurities.flatMap((security) => {
     const previousClose = security.previousClosePrice;
     const currentPrice = prices.get(security.symbol.trim().toUpperCase())?.price;
+    if (currentPrice === undefined || !Number.isFinite(currentPrice) || currentPrice <= 0) {
+      hasMissingLivePrices = true;
+      return [];
+    }
     if (
       !Number.isFinite(previousClose) ||
-      previousClose <= 0 ||
-      currentPrice === undefined ||
-      !Number.isFinite(currentPrice) ||
-      currentPrice <= 0
+      previousClose <= 0
     ) {
       return [];
     }
@@ -67,7 +69,7 @@ export function rankWatchlistMovers(
     .slice(0, limit)
     .reverse();
 
-  return { winners, losers, validPriceCount: movers.length };
+  return { winners, losers, validPriceCount: movers.length, hasMissingLivePrices };
 }
 
 export function movePinnedWatchlist(
