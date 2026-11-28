@@ -74,7 +74,7 @@ export async function updateGraphSetting(
     {
       method: "PUT",
       headers: authHeaders(true),
-      body: JSON.stringify({ ...setting, DataSource: setting.dataSource }),
+      body: JSON.stringify(setting),
     },
   );
   await ensureOk(response, "Unable to save graph settings.");

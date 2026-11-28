@@ -8,6 +8,7 @@ import {
   hoverAnchor,
 } from "@/lib/chart/plot";
 import { createTimeAxis } from "@/lib/chart/timeAxis";
+import { filterByDateBounds } from "@/lib/chart/dateBounds";
 import {
   dividendAxisNumberFormatter,
   formatDate,
@@ -63,32 +64,12 @@ export function DividendPayoutChart({
   const [logScale, setLogScale] = useDisplaySetting(profile, "chart.dividendPayouts.logScale");
   const [cardDistance, setCardDistance] = useDisplaySetting(profile, "chart.dividendPayouts.cardDistance");
   const graphSettings = useGraphSettings(GraphDataSource.DividendPayouts);
-  const graphSettingsHydrated = useRef(false);
   const [isExpanded, setIsExpanded] = useState(false);
-  const [startDate, setStartDate] = useState(
-    history[0]?.payoutDate.slice(0, 10) ?? "",
-  );
-  const [endDate, setEndDate] = useState(
-    history.at(-1)?.payoutDate.slice(0, 10) ?? "",
-  );
+  const startDate = graphSettings.settings.bounds?.startDate ?? "";
+  const endDate = graphSettings.settings.bounds?.endDate ?? "";
   const [showSettings, setShowSettings] = useState(false);
   const [chartWidth, setChartWidth] = useState(0);
   const chartRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!graphSettings.ready || graphSettingsHydrated.current) return;
-    graphSettingsHydrated.current = true;
-    setStartDate(
-      graphSettings.settings.bounds?.startDate ??
-        history[0]?.payoutDate.slice(0, 10) ??
-        "",
-    );
-    setEndDate(
-      graphSettings.settings.bounds?.endDate ??
-        history.at(-1)?.payoutDate.slice(0, 10) ??
-        "",
-    );
-  }, [graphSettings.ready, graphSettings.settings.bounds, history]);
 
   useEffect(() => {
     const chart = chartRef.current;
@@ -101,11 +82,7 @@ export function DividendPayoutChart({
   }, [isExpanded]);
 
   const filteredPayouts = useMemo(
-    () =>
-      history.filter((payout) => {
-        const date = payout.payoutDate.slice(0, 10);
-        return date >= startDate && date <= endDate;
-      }),
+    () => filterByDateBounds(history, (payout) => payout.payoutDate, startDate, endDate),
     [endDate, history, startDate],
   );
   const viewport = useChartViewport({ items: filteredPayouts, chartRef });
@@ -212,28 +189,21 @@ export function DividendPayoutChart({
               labels={dividendChartLabels}
               startDate={startDate}
               endDate={endDate}
-              minDate={history[0]?.payoutDate.slice(0, 10)}
-              maxDate={history.at(-1)?.payoutDate.slice(0, 10)}
               cardDistance={cardDistance}
               logScale={logScale}
               onStartDateChange={(value) => {
-                setStartDate(value);
                 setPan(0);
                 graphSettings.updateBounds({
                   startDate: value || null,
-                  endDate:
-                    graphSettings.settings.bounds?.endDate ?? (endDate || null),
+                  endDate: endDate || null,
                   start: graphSettings.settings.bounds?.start ?? null,
                   end: graphSettings.settings.bounds?.end ?? null,
                 });
               }}
               onEndDateChange={(value) => {
-                setEndDate(value);
                 setPan(0);
                 graphSettings.updateBounds({
-                  startDate:
-                    graphSettings.settings.bounds?.startDate ??
-                    (startDate || null),
+                  startDate: startDate || null,
                   endDate: value || null,
                   start: graphSettings.settings.bounds?.start ?? null,
                   end: graphSettings.settings.bounds?.end ?? null,

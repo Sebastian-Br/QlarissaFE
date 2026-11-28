@@ -42,6 +42,7 @@ export function useChartViewport<T>({
 
   const handleWheel = useCallback(
     (event: WheelEvent) => {
+      if (event.target instanceof Element && event.target.closest("[data-chart-overlay]")) return;
       event.preventDefault();
       event.stopPropagation();
       if (!items.length) return;

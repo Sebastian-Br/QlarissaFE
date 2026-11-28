@@ -107,10 +107,9 @@ export function ChartSettingsPanel({
   labels,
   startDate,
   endDate,
-  minDate,
-  maxDate,
   cardDistance,
   logScale,
+  liveUpdateWarning,
   onStartDateChange,
   onEndDateChange,
   onCardDistanceChange,
@@ -120,10 +119,9 @@ export function ChartSettingsPanel({
   labels: ChartSettingsLabels;
   startDate: string;
   endDate: string;
-  minDate: string | undefined;
-  maxDate: string | undefined;
   cardDistance: number;
   logScale: boolean;
+  liveUpdateWarning?: boolean;
   onStartDateChange: (value: string) => void;
   onEndDateChange: (value: string) => void;
   onCardDistanceChange: (value: number) => void;
@@ -134,7 +132,7 @@ export function ChartSettingsPanel({
     <div
       data-chart-overlay=""
       onPointerDown={(event) => event.stopPropagation()}
-      className="absolute right-4 top-14 z-50 grid w-56 gap-3 rounded-xl border border-sky-200/20 bg-[#08243d]/95 p-4 shadow-2xl"
+      className="absolute right-4 top-14 z-50 grid max-h-[calc(100%-4.5rem)] w-56 max-w-[calc(100%-2rem)] touch-pan-y gap-3 overflow-y-auto rounded-xl border border-sky-200/20 bg-[#08243d]/95 p-4 shadow-2xl"
     >
       <label className="grid gap-1 text-xs font-medium text-slate-400">
         Start
@@ -142,7 +140,6 @@ export function ChartSettingsPanel({
           aria-label={labels.startDate}
           type="date"
           value={startDate}
-          min={minDate}
           max={endDate || undefined}
           onChange={(event) => onStartDateChange(event.target.value)}
           className="h-9 rounded-lg border border-sky-200/15 bg-[#061d32] px-2 text-sm text-slate-100 outline-none focus:border-sky-400"
@@ -155,11 +152,15 @@ export function ChartSettingsPanel({
           type="date"
           value={endDate}
           min={startDate || undefined}
-          max={maxDate}
           onChange={(event) => onEndDateChange(event.target.value)}
           className="h-9 rounded-lg border border-sky-200/15 bg-[#061d32] px-2 text-sm text-slate-100 outline-none focus:border-sky-400"
         />
       </label>
+      {liveUpdateWarning && (
+        <p className="text-xs leading-relaxed text-amber-200">
+          Setting the end date can hide graph updates from live prices
+        </p>
+      )}
       <label className="grid gap-1 text-xs font-medium text-slate-400">
         Price card distance ({cardDistance}px)
         <input

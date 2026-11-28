@@ -24,6 +24,7 @@ import {
   dateToPlotX,
   nearestDateIndexAtPlotX,
 } from "@/lib/chart/timeAxis";
+import { getPriceChartHistory } from "@/lib/chart/dateBounds";
 import {
   axisNumberFormatter,
   formatDate,
@@ -164,19 +165,18 @@ export function PriceHistoryChart({
   priceHistory: DailyPrice[];
   livePriceDate: string | null;
 }) {
-  const history = useMemo(
-    () => [...priceHistory].sort((a, b) => a.date.localeCompare(b.date)),
-    [priceHistory],
-  );
   const profile = useDeviceProfile();
   const [logScale, setLogScale] = useDisplaySetting(profile, "chart.security.logScale");
   const [cardDistance, setCardDistance] = useDisplaySetting(profile, "chart.security.cardDistance");
   const [hoverBehavior, setHoverBehavior] = useDisplaySetting(profile, "chart.security.hover.behavior");
   const [dynamicRadius, setDynamicRadius] = useDisplaySetting(profile, "chart.security.hover.dynamicRadius");
   const graphSettings = useGraphSettings(GraphDataSource.Security);
-  const graphSettingsHydrated = useRef(false);
-  const [startDate, setStartDate] = useState(history[0]?.date ?? "");
-  const [endDate, setEndDate] = useState(history.at(-1)?.date ?? "");
+  const startDate = graphSettings.settings.bounds?.startDate ?? "";
+  const endDate = graphSettings.settings.bounds?.endDate ?? "";
+  const filteredHistory = useMemo(
+    () => getPriceChartHistory(priceHistory, startDate, endDate),
+    [endDate, priceHistory, startDate],
+  );
   const [cursorPlot, setCursorPlot] = useState<{ x: number; y: number } | null>(
     null,
   );
@@ -191,13 +191,6 @@ export function PriceHistoryChart({
   const chartRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!graphSettings.ready || graphSettingsHydrated.current) return;
-    graphSettingsHydrated.current = true;
-    setStartDate(graphSettings.settings.bounds?.startDate ?? history[0]?.date ?? "");
-    setEndDate(graphSettings.settings.bounds?.endDate ?? history.at(-1)?.date ?? "");
-  }, [graphSettings.ready, graphSettings.settings.bounds, history]);
-
-  useEffect(() => {
     const chart = chartRef.current;
     if (!chart) return;
     const observer = new ResizeObserver(([entry]) => {
@@ -207,15 +200,6 @@ export function PriceHistoryChart({
     return () => observer.disconnect();
   }, []);
 
-  const filteredHistory = useMemo(
-    () =>
-      history.filter(
-        (price) =>
-          (!startDate || price.date >= startDate) &&
-          (!endDate || price.date <= endDate),
-      ),
-    [endDate, history, startDate],
-  );
   const indexAtPlotX = useCallback(
     (plotX: number, items: DailyPrice[]) =>
       nearestDateIndexAtPlotX(items, plotX),
@@ -229,11 +213,14 @@ export function PriceHistoryChart({
   const { visibleItems: visibleHistory, setPan } = viewport;
 
   useEffect(() => {
-    if (livePriceDate && livePriceDate > endDate) {
-      setEndDate(livePriceDate);
+    if (
+      livePriceDate &&
+      (!startDate || livePriceDate >= startDate) &&
+      (!endDate || livePriceDate <= endDate)
+    ) {
       setPan(0);
     }
-  }, [endDate, livePriceDate, setPan]);
+  }, [endDate, livePriceDate, setPan, startDate]);
 
   useEffect(() => {
     if (
@@ -451,110 +438,109 @@ export function PriceHistoryChart({
 
   return (
     <section>
-      {visibleHistory.length > 1 ? (
-        <ChartSurface chartRef={chartRef} handlers={surfaceHandlers}>
-          <ChartSettingsButton
-            label="Toggle chart settings"
-            expanded={showSettings}
-            onToggle={() => setShowSettings((current) => !current)}
-          />
-          {showSettings && (
-            <ChartSettingsPanel
-              labels={priceChartLabels}
-              startDate={startDate}
-              endDate={endDate}
-              minDate={history[0]?.date}
-              maxDate={history.at(-1)?.date}
-              cardDistance={cardDistance}
-              logScale={logScale}
-              onStartDateChange={(value) => {
-                setStartDate(value);
-                setPan(0);
-                graphSettings.updateBounds({
-                  startDate: value || null,
-                  endDate: graphSettings.settings.bounds?.endDate ?? (endDate || null),
-                  start: graphSettings.settings.bounds?.start ?? null,
-                  end: graphSettings.settings.bounds?.end ?? null,
-                });
-              }}
-              onEndDateChange={(value) => {
-                setEndDate(value);
-                setPan(0);
-                graphSettings.updateBounds({
-                  startDate: graphSettings.settings.bounds?.startDate ?? (startDate || null),
-                  endDate: value || null,
-                  start: graphSettings.settings.bounds?.start ?? null,
-                  end: graphSettings.settings.bounds?.end ?? null,
-                });
-              }}
-              onCardDistanceChange={setCardDistance}
-              onLogScaleToggle={() => setLogScale(!logScale)}
-            >
-              <HoverBehaviorSelector
-                behavior={hoverBehavior}
-                dynamicRadius={dynamicRadius}
-                onBehaviorChange={setHoverBehavior}
-                onDynamicRadiusChange={setDynamicRadius}
-              />
-            </ChartSettingsPanel>
-          )}
-          <PriceSeries
-            name={security.name}
-            path={path}
-            dynamicRadiusPercent={dynamicRadius}
-            cursorPixel={cursorPixel}
-            showDynamicCircle={showSettings && hoverBehavior === "dynamic"}
-            dynamicCircleTouches={dynamicCircleTouches}
-            yTicks={yTicks}
-            yearTicks={yearTicks}
-            tickLabels={tickLabels}
-            selected={selectedPoint}
-          />
-          {hovered && visibleIds.has(hovered.point.id) && (
-            <ChartCrosshair anchor={hovered} showMarker />
-          )}
-          {hovered && hoveredDate && (
-            <ChartHoverLabels
-              anchor={hovered}
-              date={hoveredDate}
-              valueLabel={numberFormatter.format(hovered.point.average)}
-              showTimeHoverCard={showTimeHoverCard}
-              chartWidth={chartWidth}
-              cardDistance={cardDistance}
+      <ChartSurface chartRef={chartRef} handlers={surfaceHandlers}>
+        <ChartSettingsButton
+          label="Toggle chart settings"
+          expanded={showSettings}
+          onToggle={() => setShowSettings((current) => !current)}
+        />
+        {showSettings && (
+          <ChartSettingsPanel
+            labels={priceChartLabels}
+            startDate={startDate}
+            endDate={endDate}
+            cardDistance={cardDistance}
+            logScale={logScale}
+            liveUpdateWarning
+            onStartDateChange={(value) => {
+              setPan(0);
+              graphSettings.updateBounds({
+                startDate: value || null,
+                endDate: endDate || null,
+                start: graphSettings.settings.bounds?.start ?? null,
+                end: graphSettings.settings.bounds?.end ?? null,
+              });
+            }}
+            onEndDateChange={(value) => {
+              setPan(0);
+              graphSettings.updateBounds({
+                startDate: startDate || null,
+                endDate: value || null,
+                start: graphSettings.settings.bounds?.start ?? null,
+                end: graphSettings.settings.bounds?.end ?? null,
+              });
+            }}
+            onCardDistanceChange={setCardDistance}
+            onLogScaleToggle={() => setLogScale(!logScale)}
+          >
+            <HoverBehaviorSelector
+              behavior={hoverBehavior}
+              dynamicRadius={dynamicRadius}
+              onBehaviorChange={setHoverBehavior}
+              onDynamicRadiusChange={setDynamicRadius}
             />
-          )}
-          {axisLabels}
-          {selected && (
-            <div
-              className="pointer-events-none absolute z-10 min-w-[132px] -translate-x-1/2 -translate-y-full rounded-lg border border-sky-200/20 bg-[#08243d]/80 px-2.5 py-2 opacity-90 shadow-xl"
-              style={{ left: selected.x, top: Math.max(76, selected.y - 8) }}
-            >
-              <p className="text-[10px] text-slate-400">
-                {formatDate(selected.point.date)}
+          </ChartSettingsPanel>
+        )}
+        {visibleHistory.length > 1 ? (
+          <>
+            <PriceSeries
+              name={security.name}
+              path={path}
+              dynamicRadiusPercent={dynamicRadius}
+              cursorPixel={cursorPixel}
+              showDynamicCircle={showSettings && hoverBehavior === "dynamic"}
+              dynamicCircleTouches={dynamicCircleTouches}
+              yTicks={yTicks}
+              yearTicks={yearTicks}
+              tickLabels={tickLabels}
+              selected={selectedPoint}
+            />
+            {hovered && visibleIds.has(hovered.point.id) && (
+              <ChartCrosshair anchor={hovered} showMarker />
+            )}
+            {hovered && hoveredDate && (
+              <ChartHoverLabels
+                anchor={hovered}
+                date={hoveredDate}
+                valueLabel={numberFormatter.format(hovered.point.average)}
+                showTimeHoverCard={showTimeHoverCard}
+                chartWidth={chartWidth}
+                cardDistance={cardDistance}
+              />
+            )}
+            {axisLabels}
+            {selected && (
+              <div
+                className="pointer-events-none absolute z-10 min-w-[132px] -translate-x-1/2 -translate-y-full rounded-lg border border-sky-200/20 bg-[#08243d]/80 px-2.5 py-2 opacity-90 shadow-xl"
+                style={{ left: selected.x, top: Math.max(76, selected.y - 8) }}
+              >
+                <p className="text-[10px] text-slate-400">
+                  {formatDate(selected.point.date)}
+                </p>
+                <p className="font-semibold text-white">
+                  {formatPrice(selected.point.average, security)}
+                </p>
+                <p className="text-[10px] text-slate-400">
+                  High {formatPrice(selected.point.high, security)} · Low{" "}
+                  {formatPrice(selected.point.low, security)}
+                </p>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="grid h-full place-items-center p-6 text-center">
+            <div>
+              <Info className="mx-auto text-sky-300" size={22} />
+              <p className="mt-3 font-medium text-slate-200">
+                Not enough price data
               </p>
-              <p className="font-semibold text-white">
-                {formatPrice(selected.point.average, security)}
-              </p>
-              <p className="text-[10px] text-slate-400">
-                High {formatPrice(selected.point.high, security)} · Low{" "}
-                {formatPrice(selected.point.low, security)}
+              <p className="mt-1 text-sm text-slate-500">
+                At least two daily prices are needed to draw the chart.
               </p>
             </div>
-          )}
-        </ChartSurface>
-      ) : (
-        <div className="mt-8 grid min-h-[20rem] place-items-center rounded-xl border border-dashed border-sky-200/15 bg-[#061d32] p-6 text-center sm:min-h-[29.375rem]">
-          <div>
-            <Info className="mx-auto text-sky-300" size={22} />
-            <p className="mt-3 font-medium text-slate-200">
-              Not enough price data
-            </p>
-            <p className="mt-1 text-sm text-slate-500">
-              At least two daily prices are needed to draw the chart.
-            </p>
           </div>
-        </div>
-      )}
+        )}
+      </ChartSurface>
     </section>
   );
 }
