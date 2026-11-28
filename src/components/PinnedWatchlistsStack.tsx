@@ -2,14 +2,13 @@
 
 import {
   Lock,
-  MoveDown,
-  MoveUp,
   RefreshCw,
   Unlock,
 } from "lucide-react";
 import {
   useCallback,
   useEffect,
+  useLayoutEffect,
   useMemo,
   useRef,
   useState,
@@ -43,19 +42,72 @@ import type { Watchlist } from "@/models/Watchlist";
 
 const REFRESH_INTERVAL_MS = 60_000;
 const MOVERS_PER_DIRECTION = 5;
-const STACK_MAX_HEIGHT_PX = 576;
-const MIN_COLLAPSED_CARD_HEIGHT_PX = 86;
+const STACK_MIN_HEIGHT_PX = 576;
+const STACK_BOTTOM_MARGIN_PX = 32;
+const WARNING_RESERVE_PX = 44;
 const CARD_GAP_PX = 8;
+const CARD_BORDER_PX = 2;
+const DRAG_START_DISTANCE_PX = 6;
+const DRAG_SNAP_DURATION_MS = 180;
 const CONNECTION_RETRY_MS = 5_000;
-const MAX_VISIBLE_WATCHLISTS = Math.floor(
-  (STACK_MAX_HEIGHT_PX + CARD_GAP_PX) /
-    (MIN_COLLAPSED_CARD_HEIGHT_PX + CARD_GAP_PX),
-);
+
+function fitCount(heights: (number | undefined)[], availablePx: number): number {
+  let used = 0;
+  let count = 0;
+  for (const height of heights) {
+    const next = used + (count > 0 ? CARD_GAP_PX : 0) + (height ?? 0);
+    if (count > 0 && next > availablePx) break;
+    used = next;
+    count += 1;
+  }
+  return count;
+}
+
+function CollapsedFace({
+  watchlist,
+  winner,
+  loser,
+  measure = false,
+}: {
+  watchlist: Watchlist;
+  winner?: WatchlistMover;
+  loser?: WatchlistMover;
+  measure?: boolean;
+}) {
+  return (
+    <div
+      aria-hidden="true"
+      className={
+        measure
+          ? "flex w-20 flex-col items-center gap-1 py-2"
+          : "pointer-events-none absolute inset-0 flex min-h-0 flex-col items-center justify-between gap-1 py-2"
+      }
+    >
+      <div className="pinned-watchlist-movement flex shrink-0 flex-col items-center gap-1">
+        <span className="max-w-[72px] truncate text-xs font-semibold text-emerald-300">
+          {winner?.symbol ?? "—"}
+        </span>
+        {winner && <MovementSignal mover={winner} compact />}
+      </div>
+      <span
+        className={`whitespace-nowrap text-sm font-bold tracking-[0.12em] text-slate-200 [text-orientation:upright] [writing-mode:vertical-rl] ${measure ? "" : "min-h-0 overflow-hidden"}`}
+      >
+        {watchlist.name}
+      </span>
+      <div className="pinned-watchlist-movement flex shrink-0 flex-col items-center gap-1">
+        {loser && <MovementSignal mover={loser} compact />}
+        <span className="max-w-[72px] truncate text-xs font-semibold text-rose-300">
+          {loser?.symbol ?? "—"}
+        </span>
+      </div>
+    </div>
+  );
+}
 
 function MoverRow({ mover }: { mover: WatchlistMover }) {
   return (
     <div onClick={(event) => event.stopPropagation()} className="pinned-watchlist-row flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
-      <p title={mover.name} className="min-w-0 truncate text-base font-medium text-slate-100">{mover.name}</p>
+      <p className="min-w-0 truncate text-base font-medium text-slate-100">{mover.name}</p>
       <div className="flex shrink-0 items-center gap-4 whitespace-nowrap text-right">
         <span className="text-sm text-slate-300">{formatWatchlistPrice(mover.price, mover.currencySymbol)}</span>
         <MovementSignal mover={mover} />
@@ -101,6 +153,28 @@ export default function PinnedWatchlistsStack() {
   const [keyboardFocusedId, setKeyboardFocusedId] = useState<number | null>(null);
   const [lockedId, setLockedId] = useState<number | null>(null);
   const [draggedId, setDraggedId] = useState<number | null>(null);
+  const [pendingDragId, setPendingDragId] = useState<number | null>(null);
+  const [previewWatchlists, setPreviewWatchlists] = useState<Watchlist[] | null>(null);
+  const [stackHeight, setStackHeight] = useState(STACK_MIN_HEIGHT_PX);
+  const stackRef = useRef<HTMLDivElement>(null);
+  const probeRef = useRef<HTMLDivElement>(null);
+  const [cardHeights, setCardHeights] = useState<Record<number, number>>({});
+  const cardRefs = useRef<Map<number, HTMLElement>>(new Map());
+  const previousCardPositionsRef = useRef<Map<number, DOMRect>>(new Map());
+  const cardAnimationsRef = useRef<Animation[]>([]);
+  const pendingDragIdRef = useRef<number | null>(null);
+  const pendingDragTimerRef = useRef<number | null>(null);
+  const draggedIdRef = useRef<number | null>(null);
+  const dragPointerRef = useRef<{ x: number; y: number } | null>(null);
+  const dragSnapStartRef = useRef<number | null>(null);
+  const previewWatchlistsRef = useRef<Watchlist[] | null>(null);
+  const pointerGestureRef = useRef<{
+    id: number;
+    pointerId: number;
+    startX: number;
+    startY: number;
+  } | null>(null);
+  const suppressClickRef = useRef(false);
   const orderSaveInProgress = useRef(false);
   const desiredSymbolsRef = useRef<string[]>([]);
   const reconcileRef = useRef<(() => void) | null>(null);
@@ -109,8 +183,46 @@ export default function PinnedWatchlistsStack() {
     [watchlists],
   );
   const symbolsKey = symbols.join("\u0000");
-  const visibleWatchlists = watchlists.slice(0, MAX_VISIBLE_WATCHLISTS);
-  const hiddenCount = watchlists.length - visibleWatchlists.length;
+  const maxVisibleWatchlists = fitCount(
+    watchlists.map((item) => cardHeights[item.id]),
+    stackHeight,
+  );
+  const hiddenCount = Math.max(0, watchlists.length - maxVisibleWatchlists);
+
+  useLayoutEffect(() => {
+    const probe = probeRef.current;
+    if (!probe) return;
+    const next: Record<number, number> = {};
+    Array.from(probe.children).forEach((child) => {
+      const id = Number((child as HTMLElement).dataset.id);
+      next[id] = Math.ceil((child as HTMLElement).offsetHeight) + CARD_BORDER_PX;
+    });
+    setCardHeights((current) => {
+      const keys = Object.keys(next);
+      const same = keys.length === Object.keys(current).length &&
+        keys.every((key) => current[Number(key)] === next[Number(key)]);
+      return same ? current : next;
+    });
+  }, [watchlists, livePrices]);
+
+  useLayoutEffect(() => {
+    const element = stackRef.current;
+    if (!element) return;
+    const update = () => {
+      const top = element.getBoundingClientRect().top + window.scrollY;
+      const reserve = hiddenCount > 0 ? WARNING_RESERVE_PX : 0;
+      const available = window.innerHeight - top - STACK_BOTTOM_MARGIN_PX - reserve;
+      setStackHeight(Math.max(STACK_MIN_HEIGHT_PX, Math.floor(available)));
+    };
+    update();
+    window.addEventListener("resize", update);
+    const observer = new ResizeObserver(update);
+    observer.observe(document.body);
+    return () => {
+      window.removeEventListener("resize", update);
+      observer.disconnect();
+    };
+  }, [hiddenCount, orderError, loadError]);
 
   useEffect(() => {
     let active = true;
@@ -312,13 +424,179 @@ export default function PinnedWatchlistsStack() {
     }
   }, [watchlists]);
 
-  const moveWatchlist = useCallback(
-    (watchlistId: number, targetIndex: number) => {
-      const next = movePinnedWatchlist(watchlists, watchlistId, targetIndex);
-      void saveOrder(next);
+  const captureCardPositions = useCallback(() => {
+    const positions = new Map<number, DOMRect>();
+    cardRefs.current.forEach((element, id) => {
+      positions.set(id, element.getBoundingClientRect());
+    });
+    previousCardPositionsRef.current = positions;
+  }, []);
+
+  const clearPendingDrag = useCallback(() => {
+    if (pendingDragTimerRef.current !== null) {
+      window.clearTimeout(pendingDragTimerRef.current);
+      pendingDragTimerRef.current = null;
+    }
+    pendingDragIdRef.current = null;
+    setPendingDragId(null);
+  }, []);
+
+  const activateDrag = useCallback(
+    (watchlistId: number) => {
+      if (pendingDragIdRef.current !== watchlistId) return;
+      clearPendingDrag();
+      captureCardPositions();
+      draggedIdRef.current = watchlistId;
+      dragSnapStartRef.current = performance.now();
+      previewWatchlistsRef.current = watchlists;
+      setPreviewWatchlists(watchlists);
+      setDraggedId(watchlistId);
     },
-    [saveOrder, watchlists],
+    [captureCardPositions, clearPendingDrag, watchlists],
   );
+
+  const finishDrag = useCallback(
+    (save: boolean, targetIndex?: number) => {
+      const activeDraggedId = draggedIdRef.current;
+      if (activeDraggedId !== null) {
+        const element = cardRefs.current.get(activeDraggedId);
+        const from = element?.style.transform;
+        if (element && from) {
+          element.style.transform = "";
+          element.animate(
+            [{ transform: from }, { transform: "none" }],
+            { duration: 200, easing: "cubic-bezier(0.4, 0, 0.2, 1)" },
+          );
+        }
+      }
+      dragPointerRef.current = null;
+      dragSnapStartRef.current = null;
+      if (save && activeDraggedId !== null) {
+        const base = previewWatchlistsRef.current ?? watchlists;
+        const next = targetIndex === undefined
+          ? base
+          : movePinnedWatchlist(base, activeDraggedId, targetIndex);
+        void saveOrder(next);
+      }
+      clearPendingDrag();
+      draggedIdRef.current = null;
+      previewWatchlistsRef.current = null;
+      pointerGestureRef.current = null;
+      setPreviewWatchlists(null);
+      setDraggedId(null);
+    },
+    [clearPendingDrag, saveOrder, watchlists],
+  );
+
+  const previewWatchlistMove = useCallback(
+    (targetIndex: number) => {
+      const activeDraggedId = draggedIdRef.current;
+      if (activeDraggedId === null) return;
+      const base = previewWatchlistsRef.current ?? watchlists;
+      const next = movePinnedWatchlist(base, activeDraggedId, targetIndex);
+      if (next === base) return;
+      captureCardPositions();
+      previewWatchlistsRef.current = next;
+      setPreviewWatchlists(next);
+    },
+    [captureCardPositions, watchlists],
+  );
+
+  // Layout-based geometry (offset*) ignores transforms, so slot detection is
+  // stable while cards animate or the dragged card is translated.
+  const applyDragTransform = useCallback(() => {
+    const activeDraggedId = draggedIdRef.current;
+    const pointer = dragPointerRef.current;
+    if (activeDraggedId === null || pointer === null) return;
+    const element = cardRefs.current.get(activeDraggedId);
+    const parent = element?.offsetParent as HTMLElement | null;
+    if (!element || !parent) return;
+    const parentRect = parent.getBoundingClientRect();
+    const dx = pointer.x - parentRect.left - parent.clientLeft - (element.offsetLeft + element.offsetWidth / 2);
+    const dy = pointer.y - parentRect.top - parent.clientTop - (element.offsetTop + element.offsetHeight / 2);
+    let follow = 1;
+    if (dragSnapStartRef.current !== null) {
+      const progress = Math.min(
+        1,
+        (performance.now() - dragSnapStartRef.current) / DRAG_SNAP_DURATION_MS,
+      );
+      follow = 1 - (1 - progress) ** 3;
+      if (progress >= 1) dragSnapStartRef.current = null;
+    }
+    element.style.transform = `translate(${dx * follow}px, ${dy * follow}px) scale(${1 + 0.03 * follow})`;
+  }, []);
+
+  useEffect(() => {
+    if (draggedId === null) return;
+    let frame = 0;
+    const tick = () => {
+      applyDragTransform();
+      if (dragSnapStartRef.current !== null) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [applyDragTransform, draggedId]);
+
+  const moveDragPreview = useCallback(
+    (pointerX: number, pointerY: number) => {
+      const current = previewWatchlistsRef.current;
+      const activeDraggedId = draggedIdRef.current;
+      if (current === null || activeDraggedId === null) return;
+      dragPointerRef.current = { x: pointerX, y: pointerY };
+      applyDragTransform();
+
+      const parent = cardRefs.current.get(activeDraggedId)?.offsetParent as HTMLElement | null;
+      if (!parent) return;
+      const localY = pointerY - parent.getBoundingClientRect().top - parent.clientTop;
+
+      let nearestIndex = current.findIndex((item) => item.id === activeDraggedId);
+      let nearestDistance = Number.POSITIVE_INFINITY;
+      current.forEach((watchlist, index) => {
+        const element = cardRefs.current.get(watchlist.id);
+        if (!element) return;
+        const distance = Math.abs(localY - (element.offsetTop + element.offsetHeight / 2));
+        if (distance < nearestDistance) {
+          nearestDistance = distance;
+          nearestIndex = index;
+        }
+      });
+      previewWatchlistMove(nearestIndex);
+    },
+    [applyDragTransform, previewWatchlistMove],
+  );
+
+  useLayoutEffect(() => {
+    cardAnimationsRef.current.forEach((animation) => animation.cancel());
+    cardAnimationsRef.current = [];
+    if (draggedId === null || previewWatchlists === null) return;
+
+    applyDragTransform();
+    previewWatchlists.forEach((watchlist) => {
+      if (watchlist.id === draggedId) return;
+      const element = cardRefs.current.get(watchlist.id);
+      const previous = previousCardPositionsRef.current.get(watchlist.id);
+      if (!element || !previous) return;
+
+      const current = element.getBoundingClientRect();
+      const deltaY = previous.top - current.top;
+      if (Math.abs(deltaY) < 1) return;
+
+      const animation = element.animate(
+        [
+          { transform: `translateY(${deltaY}px)` },
+          { transform: "translateY(0)" },
+        ],
+        {
+          duration: 500,
+          easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+        },
+      );
+      cardAnimationsRef.current.push(animation);
+    });
+  }, [applyDragTransform, draggedId, previewWatchlists]);
+
+  const displayWatchlists = previewWatchlists ?? watchlists;
+  const visibleWatchlists = displayWatchlists.slice(0, maxVisibleWatchlists);
 
   return (
     <section
@@ -344,13 +622,27 @@ export default function PinnedWatchlistsStack() {
       {priceConnectionError && (
         <p className="sr-only" role="status">Live watchlist prices are reconnecting.</p>
       )}
-      {hiddenCount > 0 && (
-        <p className="rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100" role="status">
-          {hiddenCount} pinned {hiddenCount === 1 ? "watchlist cannot" : "watchlists cannot"} fit here. Unpin a list to display all.
-        </p>
-      )}
-      <div className="flex h-[36rem] max-h-[36rem] min-h-0 flex-col gap-2 overflow-visible">
-        {visibleWatchlists.map((watchlist, index) => {
+      <div
+        ref={probeRef}
+        aria-hidden="true"
+        className="pointer-events-none invisible fixed left-0 top-0 -z-10"
+      >
+        {watchlists.map((watchlist) => {
+          const { winners, losers } = rankWatchlistMovers(watchlist, livePrices, MOVERS_PER_DIRECTION);
+          return (
+            <div key={watchlist.id} data-id={watchlist.id}>
+              <CollapsedFace
+                measure
+                watchlist={watchlist}
+                winner={winners[0]}
+                loser={losers[losers.length - 1]}
+              />
+            </div>
+          );
+        })}
+      </div>
+      <div ref={stackRef} style={{ height: stackHeight }} className="flex min-h-0 flex-col gap-2 overflow-visible">
+        {visibleWatchlists.map((watchlist) => {
           const { winners, losers, validPriceCount } = rankWatchlistMovers(
             watchlist,
             livePrices,
@@ -358,22 +650,86 @@ export default function PinnedWatchlistsStack() {
           );
           const strongestWinner = winners[0];
           const strongestLoser = losers[losers.length - 1];
-          const expanded = draggedId === null &&
+          const expanded = draggedId === null && pendingDragId === null &&
             (lockedId ?? hoveredId ?? keyboardFocusedId) === watchlist.id;
 
           return (
             <article
               key={watchlist.id}
+              ref={(element) => {
+                if (element) cardRefs.current.set(watchlist.id, element);
+                else cardRefs.current.delete(watchlist.id);
+              }}
               tabIndex={0}
               aria-label={watchlist.name}
-              title={visibleWatchlists.length > 1 ? "Drag to reorder; use the move buttons for keyboard reordering." : undefined}
-              draggable={!savingOrder && visibleWatchlists.length > 1}
-              onDragStart={(event) => {
-                event.dataTransfer.effectAllowed = "move";
-                event.dataTransfer.setData("text/plain", String(watchlist.id));
-                setDraggedId(watchlist.id);
+              draggable={false}
+              onDragStart={(event) => event.preventDefault()}
+              onPointerDown={(event) => {
+                if (
+                  event.button !== 0 ||
+                  savingOrder ||
+                  lockedId === watchlist.id ||
+                  visibleWatchlists.length < 2 ||
+                  (event.target as HTMLElement).closest("button")
+                ) return;
+                pointerGestureRef.current = {
+                  id: watchlist.id,
+                  pointerId: event.pointerId,
+                  startX: event.clientX,
+                  startY: event.clientY,
+                };
+                event.currentTarget.setPointerCapture(event.pointerId);
+              }}
+              onPointerMove={(event) => {
+                const gesture = pointerGestureRef.current;
+                if (!gesture || gesture.id !== watchlist.id || gesture.pointerId !== event.pointerId)
+                  return;
+
+                dragPointerRef.current = { x: event.clientX, y: event.clientY };
+                if (draggedIdRef.current === watchlist.id) {
+                  event.preventDefault();
+                  moveDragPreview(event.clientX, event.clientY);
+                  return;
+                }
+                if (pendingDragIdRef.current === watchlist.id) return;
+
+                const distance = Math.hypot(
+                  event.clientX - gesture.startX,
+                  event.clientY - gesture.startY,
+                );
+                if (distance < DRAG_START_DISTANCE_PX) return;
+
+                event.preventDefault();
+                suppressClickRef.current = true;
+                setHoveredId(null);
+                setKeyboardFocusedId(null);
+                pendingDragIdRef.current = watchlist.id;
+                setPendingDragId(watchlist.id);
+                pendingDragTimerRef.current = window.setTimeout(
+                  () => activateDrag(watchlist.id),
+                  250,
+                );
+              }}
+              onPointerUp={(event) => {
+                if (pointerGestureRef.current?.pointerId !== event.pointerId) return;
+                if (event.currentTarget.hasPointerCapture(event.pointerId))
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                const shouldSave = draggedIdRef.current === watchlist.id;
+                finishDrag(shouldSave);
+              }}
+              onPointerCancel={() => {
+                finishDrag(false);
+              }}
+              onTransitionEnd={(event) => {
+                if (event.propertyName === "width")
+                  activateDrag(watchlist.id);
               }}
               onClick={(event) => {
+                if (suppressClickRef.current) {
+                  suppressClickRef.current = false;
+                  event.preventDefault();
+                  return;
+                }
                 if ((event.target as HTMLElement).closest("button")) return;
                 setLockedId((current) => current === watchlist.id ? null : watchlist.id);
               }}
@@ -393,42 +749,20 @@ export default function PinnedWatchlistsStack() {
               }}
               onMouseEnter={() => setHoveredId(watchlist.id)}
               onMouseLeave={() => setHoveredId(null)}
-              onDragOver={(event) => event.preventDefault()}
-              onDrop={(event) => {
-                event.preventDefault();
-                if (draggedId !== null) moveWatchlist(draggedId, index);
-                setDraggedId(null);
-              }}
-              onDragEnd={() => setDraggedId(null)}
-              style={{ minHeight: MIN_COLLAPSED_CARD_HEIGHT_PX }}
-              className={`pinned-watchlist-card group relative flex-[1_1_0%] overflow-hidden rounded-2xl border border-sky-200/10 bg-slate-900/60 shadow-xl shadow-slate-950/20 backdrop-blur-sm transition-[width] duration-500 ease-out ${
+              style={{ minHeight: cardHeights[watchlist.id] }}
+              className={`pinned-watchlist-card group relative flex-[1_1_0%] select-none overflow-hidden rounded-2xl border border-sky-200/10 bg-slate-900/60 shadow-xl shadow-slate-950/20 backdrop-blur-sm transition-[width] ease-out ${
+                pendingDragId !== null || draggedId !== null ? "duration-200" : "duration-500"
+              } ${
                 expanded ? "z-20 xl:w-[30rem]" : "z-0 xl:w-20"
-              } ${visibleWatchlists.length > 1 ? "cursor-grab active:cursor-grabbing" : ""} ${draggedId === watchlist.id ? "opacity-55" : ""}`}
+              } ${visibleWatchlists.length > 1 && lockedId !== watchlist.id ? "cursor-grab active:cursor-grabbing" : ""} ${draggedId === watchlist.id ? "!z-30 cursor-grabbing shadow-2xl shadow-sky-950/60" : ""}`}
             >
-              <div aria-hidden="true" className={`absolute inset-0 flex min-h-0 flex-col items-center justify-between gap-1 py-2 transition-opacity duration-200 ${expanded ? "pointer-events-none opacity-0" : ""}`}>
-                <div className="pinned-watchlist-movement flex shrink-0 flex-col items-center gap-1">
-                  <span className="max-w-[72px] truncate text-xs font-semibold text-emerald-300">
-                    {strongestWinner?.symbol ?? "—"}
-                  </span>
-                  {strongestWinner && <MovementSignal mover={strongestWinner} compact />}
-                </div>
-                <span
-                  className="min-h-0 overflow-hidden whitespace-nowrap text-xs font-semibold tracking-wider text-slate-400 [text-orientation:upright] [writing-mode:vertical-rl]"
-                  title={watchlist.name}
-                >
-                  {watchlist.name}
-                </span>
-                <div className="pinned-watchlist-movement flex shrink-0 flex-col items-center gap-1">
-                  {strongestLoser && <MovementSignal mover={strongestLoser} compact />}
-                  <span className="max-w-[72px] truncate text-xs font-semibold text-rose-300">
-                    {strongestLoser?.symbol ?? "—"}
-                  </span>
-                </div>
+              <div className={`transition-opacity duration-200 ${expanded ? "opacity-0" : ""}`}>
+                <CollapsedFace watchlist={watchlist} winner={strongestWinner} loser={strongestLoser} />
               </div>
               <div
                 aria-hidden={!expanded}
                 inert={!expanded && draggedId !== watchlist.id}
-                className={`pinned-watchlist-content absolute inset-0 flex h-full flex-col p-4 transition-opacity duration-200 xl:p-5 ${
+                className={`pinned-watchlist-content absolute inset-0 flex h-full flex-col p-4 transition-opacity duration-200 xl:right-auto xl:w-[30rem] xl:p-5 ${
                   expanded ? "opacity-100 delay-200" : "pointer-events-none opacity-0"
                 }`}
               >
@@ -437,7 +771,10 @@ export default function PinnedWatchlistsStack() {
                     <h2 className="truncate text-base font-semibold text-slate-100">
                       {watchlist.name}
                     </h2>
-                    <p className="pinned-watchlist-subtitle text-sm text-slate-400">Today&apos;s movement</p>
+                    <p className="pinned-watchlist-subtitle mt-1 text-sm text-slate-400">
+                      Tracks changes over {watchlist.trackedChangeDurationTradingDays} trading{" "}
+                      {watchlist.trackedChangeDurationTradingDays === 1 ? "day" : "days"}
+                    </p>
                   </div>
                   <button
                     type="button"
@@ -452,33 +789,9 @@ export default function PinnedWatchlistsStack() {
                   >
                     {lockedId === watchlist.id ? <Lock size={17} /> : <Unlock size={17} />}
                   </button>
-                  <button
-                    type="button"
-                    aria-label={`Move ${watchlist.name} up`}
-                    disabled={index === 0}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      moveWatchlist(watchlist.id, index - 1);
-                    }}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-800 hover:text-sky-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <MoveUp size={15} />
-                  </button>
-                  <button
-                    type="button"
-                    aria-label={`Move ${watchlist.name} down`}
-                    disabled={index === visibleWatchlists.length - 1}
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      moveWatchlist(watchlist.id, index + 1);
-                    }}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-slate-500 transition-colors hover:bg-slate-800 hover:text-sky-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 disabled:cursor-not-allowed disabled:opacity-30"
-                  >
-                    <MoveDown size={15} />
-                  </button>
                 </header>
                 <div className="flex min-h-0 flex-1 flex-col">
-                  <div className="min-h-0 flex-1 overflow-y-auto">
+                  <div className="pinned-watchlist-scroll min-h-0 flex-1">
                     {winners.length ? (
                       winners.map((mover) => (
                         <MoverRow key={mover.securityId} mover={mover} />
@@ -489,7 +802,7 @@ export default function PinnedWatchlistsStack() {
                       </p>
                     )}
                   </div>
-                  <div className="flex min-h-0 flex-1 flex-col overflow-y-auto border-t border-slate-700/70">
+                  <div className="pinned-watchlist-scroll flex min-h-0 flex-1 flex-col border-t border-slate-700/70">
                     <div className="mt-auto">
                     {losers.length ? (
                       losers.map((mover) => (
@@ -516,6 +829,22 @@ export default function PinnedWatchlistsStack() {
           </div>
         )}
       </div>
+      {hiddenCount > 0 && (
+        <div className="group relative">
+          <p
+            tabIndex={0}
+            role="status"
+            className="cursor-default rounded-lg border border-amber-300/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-100 outline-none transition-colors duration-200 hover:bg-amber-400/20 focus-visible:bg-amber-400/20 focus-visible:ring-2 focus-visible:ring-amber-300/50"
+          >
+            {hiddenCount} pinned {hiddenCount === 1 ? "watchlist cannot" : "watchlists cannot"} fit here. Unpin a list to display all.
+          </p>
+          <ul className="pointer-events-none absolute bottom-full left-0 z-40 mb-2 max-h-60 w-full overflow-hidden rounded-xl border border-amber-300/30 bg-[#08243d] p-2 text-xs text-slate-200 opacity-0 shadow-xl shadow-slate-950/50 transition-opacity duration-200 group-focus-within:opacity-100 group-hover:opacity-100">
+            {watchlists.slice(maxVisibleWatchlists).map((item) => (
+              <li key={item.id} className="truncate px-2 py-1">{item.name}</li>
+            ))}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }

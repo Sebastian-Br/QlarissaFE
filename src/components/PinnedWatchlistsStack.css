@@ -1,5 +1,22 @@
 .pinned-watchlist-card {
   container: pinned-watchlist / size;
+  touch-action: none;
+  -webkit-user-drag: none;
+}
+
+.pinned-watchlist-card svg {
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+.pinned-watchlist-scroll {
+  overflow: hidden;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.pinned-watchlist-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 @container pinned-watchlist (max-height: 260px) {
@@ -9,10 +26,6 @@
 
   .pinned-watchlist-header {
     margin-bottom: 0;
-  }
-
-  .pinned-watchlist-subtitle {
-    display: none;
   }
 }
 
