@@ -117,6 +117,25 @@ test("valid unchanged and one-sided prices are distinct from unavailable prices"
   assert.equal(pinnedWatchlists.rankWatchlistMovers(watchlist, new Map(), 5).validPriceCount, 0);
 });
 
+test("missing live price indicator excludes other reasons securities are hidden", () => {
+  const watchlist = createWatchlist(1, 1, [
+    { securityId: 1, symbol: " SAME ", name: "Unchanged", previousClosePrice: 100 },
+    { securityId: 2, symbol: "BASE", name: "Invalid baseline", previousClosePrice: 0 },
+    { securityId: 3, symbol: "MISS", name: "Missing live price", previousClosePrice: 100 },
+  ]);
+  const prices = new Map([
+    ["SAME", { symbol: "SAME", timestamp: "", price: 100 }],
+    ["BASE", { symbol: "BASE", timestamp: "", price: 110 }],
+  ]);
+
+  assert.equal(pinnedWatchlists.rankWatchlistMovers(watchlist, prices, 5).hasMissingLivePrices, true);
+  prices.set("MISS", { symbol: "MISS", timestamp: "", price: 0 });
+  assert.equal(pinnedWatchlists.rankWatchlistMovers(watchlist, prices, 5).hasMissingLivePrices, true);
+  prices.set("MISS", { symbol: "MISS", timestamp: "", price: 110 });
+  assert.equal(pinnedWatchlists.rankWatchlistMovers(watchlist, prices, 0).hasMissingLivePrices, false);
+  assert.equal(pinnedWatchlists.rankWatchlistMovers(createWatchlist(2, 2, []), prices, 5).hasMissingLivePrices, false);
+});
+
 test("movers retain the five strongest results in each direction", () => {
   const securities = Array.from({ length: 12 }, (_, index) => ({
     securityId: index,

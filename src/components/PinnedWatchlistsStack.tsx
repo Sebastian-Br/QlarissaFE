@@ -2,10 +2,12 @@
 
 import {
   History,
+  Info,
   Lock,
   RefreshCw,
   Unlock,
 } from "lucide-react";
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -108,13 +110,18 @@ function CollapsedFace({
 
 function MoverRow({ mover }: { mover: WatchlistMover }) {
   return (
-    <div onClick={(event) => event.stopPropagation()} className="pinned-watchlist-row flex items-center justify-between gap-4 rounded-xl px-2 py-2.5 hover:bg-slate-800/50">
+    <Link
+      href={`/security/${mover.securityId}`}
+      aria-label={`View ${mover.name} details`}
+      onClick={(event) => event.stopPropagation()}
+      className="pinned-watchlist-row flex cursor-pointer items-center justify-between gap-4 rounded-xl px-2 py-2.5 transition-colors hover:bg-slate-800/50 focus-visible:bg-slate-800/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-sky-300 active:bg-slate-800/80"
+    >
       <p className="min-w-0 truncate text-base font-medium text-slate-100">{mover.name}</p>
       <div className="flex shrink-0 items-center gap-4 whitespace-nowrap text-right">
         <span className="text-sm text-slate-300">{formatWatchlistPrice(mover.price, mover.currencySymbol)}</span>
         <MovementSignal mover={mover} />
       </div>
-    </div>
+    </Link>
   );
 }
 
@@ -645,7 +652,7 @@ export default function PinnedWatchlistsStack() {
       </div>
       <div ref={stackRef} style={{ height: stackHeight }} className="flex min-h-0 flex-col gap-2 overflow-visible">
         {visibleWatchlists.map((watchlist) => {
-          const { winners, losers, validPriceCount } = rankWatchlistMovers(
+          const { winners, losers, validPriceCount, hasMissingLivePrices } = rankWatchlistMovers(
             watchlist,
             livePrices,
             MOVERS_PER_DIRECTION,
@@ -672,7 +679,7 @@ export default function PinnedWatchlistsStack() {
                   savingOrder ||
                   lockedId === watchlist.id ||
                   visibleWatchlists.length < 2 ||
-                  (event.target as HTMLElement).closest("button")
+                  (event.target as HTMLElement).closest("button, a")
                 ) return;
                 pointerGestureRef.current = {
                   id: watchlist.id,
@@ -785,12 +792,33 @@ export default function PinnedWatchlistsStack() {
                       </TooltipTrigger>
                       <TooltipContent
                         side="top"
+                        showArrow={false}
                         className="max-w-72 border border-sky-200/15 bg-slate-800 text-slate-100 shadow-xl"
                       >
                         Tracks changes over {watchlist.trackedChangeDurationTradingDays} trading{" "}
                         {watchlist.trackedChangeDurationTradingDays === 1 ? "day" : "days"}.
                       </TooltipContent>
                     </Tooltip>
+                    {hasMissingLivePrices && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            aria-label="Some securities are waiting for live prices"
+                            className="shrink-0 cursor-help rounded text-amber-300 transition-colors hover:text-amber-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-300"
+                          >
+                            <Info size={16} aria-hidden="true" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="top"
+                          showArrow={false}
+                          className="max-w-72 border border-sky-200/15 bg-slate-800 text-slate-100 shadow-xl"
+                        >
+                          Some securities are not shown because they have not received a live price update yet.
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                   <button
                     type="button"
