@@ -8,6 +8,7 @@ import {
   type GraphSettings,
 } from "@/models/GraphSettings";
 import { authenticatedFetch } from "./authenticatedFetch";
+import { sharedRequest } from "./sharedRequest";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
@@ -34,15 +35,20 @@ async function ensureOk(response: Response, fallback: string): Promise<void> {
   throw new SettingsApiError(message || fallback, response.status);
 }
 
-export async function getGraphSettings(
+export function getGraphSettings(
   signal?: AbortSignal,
 ): Promise<GraphSettings[]> {
-  const response = await authenticatedFetch(`${BASE_URL}/api/Settings/GetGraphSettings`, {
+  return sharedRequest(
+    "graph-settings",
+    async () => {
+      const response = await authenticatedFetch(`${BASE_URL}/api/Settings/GetGraphSettings`, {
+        headers: authHeaders(),
+      });
+      await ensureOk(response, "Unable to load graph settings.");
+      return response.json() as Promise<GraphSettings[]>;
+    },
     signal,
-    headers: authHeaders(),
-  });
-  await ensureOk(response, "Unable to load graph settings.");
-  return response.json();
+  );
 }
 
 export async function getGraphSetting(

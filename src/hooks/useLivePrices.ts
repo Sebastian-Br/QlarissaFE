@@ -116,17 +116,21 @@ export function useLivePrices({
       if (cause) reportConnectionError("connection", cause);
       else if (!disposed) setLiveUpdatesUnavailable(true);
     });
-    void (async () => {
-      try {
-        await connection?.start();
-        await subscribe();
-      } catch (cause) {
-        reportConnectionError("connection", cause);
-      }
-    })();
+    // Deferred so a development remount cleans up before any negotiation request is sent.
+    const startTimer = setTimeout(() => {
+      void (async () => {
+        try {
+          await connection?.start();
+          await subscribe();
+        } catch (cause) {
+          reportConnectionError("connection", cause);
+        }
+      })();
+    }, 0);
 
     return () => {
       disposed = true;
+      clearTimeout(startTimer);
       if (unavailableTimerRef.current) clearTimeout(unavailableTimerRef.current);
       connection?.off("PriceSnapshot", handleSnapshot);
       connection?.off("PriceBatch", handleBatch);

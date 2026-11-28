@@ -29,9 +29,12 @@ export function useSecurityWatchlists(securityId: number) {
     setWatchlists(null);
     setWatchedWatchlistIds(null);
     setWatchlistsFailed(false);
-    getWatchlistsMinimal()
+    getWatchlistsMinimal(controller.signal)
       .then(setWatchlists)
-      .catch(() => setWatchlistsFailed(true));
+      .catch((cause) => {
+        if (!(cause instanceof DOMException && cause.name === "AbortError"))
+          setWatchlistsFailed(true);
+      });
     getWatchlistIdsForSecurity(securityId, controller.signal)
       .then(setWatchedWatchlistIds)
       .catch((cause) => {

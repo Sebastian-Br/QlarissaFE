@@ -1,19 +1,26 @@
 import type { WatchlistMinimal } from "@/models/WatchlistMinimal";
 import type { Watchlist } from "@/models/Watchlist";
 import { authenticatedFetch } from "./authenticatedFetch";
+import { sharedRequest } from "./sharedRequest";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export async function getWatchlistsMinimal(): Promise<WatchlistMinimal[]> {
-  const response = await authenticatedFetch(`${BASE_URL}/api/Watchlist/GetWatchlistsMinimal`, {
-    headers: {
-      accept: "application/json",
+export function getWatchlistsMinimal(signal?: AbortSignal): Promise<WatchlistMinimal[]> {
+  return sharedRequest(
+    "watchlists-minimal",
+    async () => {
+      const response = await authenticatedFetch(`${BASE_URL}/api/Watchlist/GetWatchlistsMinimal`, {
+        headers: {
+          accept: "application/json",
+        },
+      });
+
+      if (!response.ok) throw new Error("Unable to load watchlists.");
+
+      return response.json() as Promise<WatchlistMinimal[]>;
     },
-  });
-
-  if (!response.ok) throw new Error("Unable to load watchlists.");
-
-  return response.json();
+    signal,
+  );
 }
 
 export async function getPinnedWatchlists(
@@ -86,23 +93,28 @@ export async function addWatchlist(watchlist: WatchlistMinimal): Promise<Watchli
   return response.json();
 }
 
-export async function getWatchlistIdsForSecurity(
+export function getWatchlistIdsForSecurity(
   securityId: number,
   signal?: AbortSignal,
 ): Promise<number[]> {
-  const response = await authenticatedFetch(
-    `${BASE_URL}/api/Watchlist/GetWatchlistIdsForSecurity?securityId=${encodeURIComponent(securityId)}`,
-    {
-      signal,
-      headers: {
-        accept: "application/json",
-      },
+  return sharedRequest(
+    `watchlist-ids:${securityId}`,
+    async () => {
+      const response = await authenticatedFetch(
+        `${BASE_URL}/api/Watchlist/GetWatchlistIdsForSecurity?securityId=${encodeURIComponent(securityId)}`,
+        {
+          headers: {
+            accept: "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) throw new Error("Unable to load watchlist membership.");
+
+      return response.json() as Promise<number[]>;
     },
+    signal,
   );
-
-  if (!response.ok) throw new Error("Unable to load watchlist membership.");
-
-  return response.json();
 }
 
 export async function watchSecurity(watchlistId: number, securityId: number): Promise<void> {
