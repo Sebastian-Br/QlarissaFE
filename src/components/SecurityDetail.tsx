@@ -13,8 +13,10 @@ import { PriceSummary } from "@/components/security/PriceSummary";
 import { SecurityHeader } from "@/components/security/SecurityHeader";
 import { UpdatingOverlay } from "@/components/security/UpdatingOverlay";
 import { useLivePrices } from "@/hooks/useLivePrices";
+import { useGraphSettings } from "@/hooks/useGraphSettings";
 import { useSecurityWatchlists } from "@/hooks/useSecurityWatchlists";
-import { dateOnlyFromTimestamp } from "@/lib/livePrices";
+import { dateOnlyFromTimestamp, mergeLivePriceIntoHistory } from "@/lib/livePrices";
+import { GraphDataSource } from "@/models/GraphSettings";
 import {
   SecurityType,
   type DailyPrice,
@@ -29,33 +31,48 @@ export default function SecurityDetail() {
   const [error, setError] = useState(false);
   const [isUpdating, setIsUpdating] = useState(false);
   const [updateError, setUpdateError] = useState<string | null>(null);
+  const graphSettings = useGraphSettings(GraphDataSource.Security);
+  const securitySettings = graphSettings.settings.dataSource === GraphDataSource.Security
+    ? graphSettings.settings
+    : null;
   const watchlists = useSecurityWatchlists(securityId);
-  const { livePrice, liveTimestamp, liveUpdatesUnavailable } = useLivePrices({
+  const { livePrice, liveTimestamp, liveUpdatesUnavailable, latestLiveUpdateRef } = useLivePrices({
     security,
     securityId,
     setGraphHistory,
   });
 
   useEffect(() => {
+    setSecurity(null);
+    setGraphHistory([]);
     if (!Number.isInteger(securityId) || securityId < 1) {
       setError(true);
       return;
     }
-    const controller = new AbortController();
-    setSecurity(null);
-    setGraphHistory([]);
     setError(false);
-    getSecurity(securityId, controller.signal)
+  }, [securityId]);
+
+  useEffect(() => {
+    if (!Number.isInteger(securityId) || securityId < 1 || !graphSettings.ready || !securitySettings)
+      return;
+    const controller = new AbortController();
+    getSecurity(securityId, securitySettings, controller.signal)
       .then((loadedSecurity) => {
+        if (controller.signal.aborted) return;
         setSecurity(loadedSecurity);
-        setGraphHistory(loadedSecurity.priceHistory ?? []);
+        setError(false);
+        const latest = latestLiveUpdateRef.current;
+        const date = latest ? dateOnlyFromTimestamp(latest.timestamp) : null;
+        setGraphHistory(latest && date && latest.symbol.toUpperCase() === loadedSecurity.symbol.toUpperCase()
+          ? mergeLivePriceIntoHistory(loadedSecurity.priceHistory ?? [], latest, date)
+          : loadedSecurity.priceHistory ?? []);
       })
       .catch((cause) => {
-        if (!(cause instanceof DOMException && cause.name === "AbortError"))
+        if (!controller.signal.aborted && !(cause instanceof DOMException && cause.name === "AbortError"))
           setError(true);
       });
     return () => controller.abort();
-  }, [securityId]);
+  }, [securityId, graphSettings.ready, securitySettings, latestLiveUpdateRef]);
 
   const handleUpdate = async () => {
     if (isUpdating) return;
@@ -97,7 +114,7 @@ export default function SecurityDetail() {
             Dashboard
           </Link>
         </header>
-        {!security && !error && (
+        {!security && !error && !graphSettings.error && (
           <div className="grid min-h-[65vh] place-items-center">
             <div className="text-center">
               <RefreshCw
@@ -108,7 +125,7 @@ export default function SecurityDetail() {
             </div>
           </div>
         )}
-        {error && (
+        {(error || graphSettings.error) && (
           <div className="grid min-h-[65vh] place-items-center text-center">
             <div>
               <Info className="mx-auto text-rose-300" size={28} />
@@ -149,6 +166,7 @@ export default function SecurityDetail() {
             <PriceHistoryChart
               security={security}
               priceHistory={graphHistory}
+              graphSettings={graphSettings}
               livePriceDate={
                 liveTimestamp ? dateOnlyFromTimestamp(liveTimestamp) : null
               }

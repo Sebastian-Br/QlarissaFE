@@ -32,10 +32,12 @@ function withBounds(settings: GraphSettings, bounds: Bounds | null): GraphSettin
 export function useGraphSettings(dataSource: GraphDataSource): {
   settings: GraphSettings;
   ready: boolean;
+  error: boolean;
   updateBounds: (bounds: Bounds | null) => void;
 } {
   const [settings, setSettings] = useState(() => defaultSettings(dataSource));
   const [ready, setReady] = useState(false);
+  const [error, setError] = useState(false);
   const settingsRef = useRef(settings);
   const pendingBounds = useRef<Bounds | null | undefined>(undefined);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -53,6 +55,7 @@ export function useGraphSettings(dataSource: GraphDataSource): {
   useEffect(() => {
     const controller = new AbortController();
     setReady(false);
+    setError(false);
     void getGraphSettings(controller.signal)
       .then((allSettings) => {
         if (controller.signal.aborted) return;
@@ -71,6 +74,7 @@ export function useGraphSettings(dataSource: GraphDataSource): {
       .catch((error: unknown) => {
         if (controller.signal.aborted) return;
         console.error("Unable to load typed graph settings.", error);
+        setError(true);
       });
 
     return () => {
@@ -96,5 +100,5 @@ export function useGraphSettings(dataSource: GraphDataSource): {
     [ready, scheduleSave],
   );
 
-  return { settings, ready, updateBounds };
+  return { settings, ready, error, updateBounds };
 }

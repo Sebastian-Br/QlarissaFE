@@ -53,8 +53,7 @@ import {
   type ChartSettingsLabels,
 } from "./ChartSettings";
 import { useDeviceProfile, useDisplaySetting } from "@/hooks/useDisplaySetting";
-import { useGraphSettings } from "@/hooks/useGraphSettings";
-import { GraphDataSource } from "@/models/GraphSettings";
+import type { useGraphSettings } from "@/hooks/useGraphSettings";
 
 const priceChartLabels: ChartSettingsLabels = {
   startDate: "Chart start date",
@@ -160,17 +159,18 @@ export function PriceHistoryChart({
   security,
   priceHistory,
   livePriceDate,
+  graphSettings,
 }: {
   security: PubliclyTradedSecurityBase;
   priceHistory: DailyPrice[];
   livePriceDate: string | null;
+  graphSettings: ReturnType<typeof useGraphSettings>;
 }) {
   const profile = useDeviceProfile();
   const [logScale, setLogScale] = useDisplaySetting(profile, "chart.security.logScale");
   const [cardDistance, setCardDistance] = useDisplaySetting(profile, "chart.security.cardDistance");
   const [hoverBehavior, setHoverBehavior] = useDisplaySetting(profile, "chart.security.hover.behavior");
   const [dynamicRadius, setDynamicRadius] = useDisplaySetting(profile, "chart.security.hover.dynamicRadius");
-  const graphSettings = useGraphSettings(GraphDataSource.Security);
   const startDate = graphSettings.settings.bounds?.startDate ?? "";
   const endDate = graphSettings.settings.bounds?.endDate ?? "";
   const filteredHistory = useMemo(

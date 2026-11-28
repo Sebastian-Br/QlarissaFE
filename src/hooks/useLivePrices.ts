@@ -28,16 +28,18 @@ export function useLivePrices({
   const [liveTimestamp, setLiveTimestamp] = useState<string | null>(null);
   const [liveUpdatesUnavailable, setLiveUpdatesUnavailable] = useState(false);
   const unavailableTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestLiveUpdateRef = useRef<LivePrice | null>(null);
+  const symbol = security?.symbol;
 
   useEffect(() => {
     setLivePrice(null);
     setLiveTimestamp(null);
+    latestLiveUpdateRef.current = null;
   }, [securityId]);
 
   useEffect(() => {
-    if (!security) return;
+    if (!symbol) return;
 
-    const symbol = security.symbol;
     const symbols = [symbol];
     const normalizedSymbol = symbol.toUpperCase();
     let disposed = false;
@@ -63,6 +65,7 @@ export function useLivePrices({
       const date = dateOnlyFromTimestamp(update.timestamp);
       if (!date) return;
 
+      latestLiveUpdateRef.current = update;
       setLivePrice(update.price);
       setLiveTimestamp(update.timestamp);
       setLiveUpdatesUnavailable(false);
@@ -150,7 +153,7 @@ export function useLivePrices({
         }
       })();
     };
-  }, [security, setGraphHistory]);
+  }, [symbol, setGraphHistory]);
 
-  return { livePrice, liveTimestamp, liveUpdatesUnavailable };
+  return { livePrice, liveTimestamp, liveUpdatesUnavailable, latestLiveUpdateRef };
 }

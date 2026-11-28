@@ -1,14 +1,32 @@
 import type { Security } from "@/models/Security";
+import type { SecurityGraphSettings } from "@/models/GraphSettings";
 import { authenticatedFetch } from "./authenticatedFetch";
 import { sharedRequest } from "./sharedRequest";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
 
-export function getSecurity(id: number, signal?: AbortSignal): Promise<Security> {
+export function getSecurity(
+  id: number,
+  settings: SecurityGraphSettings,
+  signal?: AbortSignal,
+): Promise<Security> {
+  const query = new URLSearchParams({
+    id: String(id),
+    "SecurityGraphSettings.DataSource": String(settings.dataSource),
+    "SecurityGraphSettings.PlotType": String(settings.plotType),
+    "SecurityGraphSettings.AsTotalReturn": String(settings.asTotalReturn),
+  });
+  if (settings.bounds) {
+    for (const [key, value] of Object.entries(settings.bounds)) {
+      if (value !== null)
+        query.set(`SecurityGraphSettings.Bounds.${key}`, String(value));
+    }
+  }
+  const url = `${BASE_URL}/api/Security/Get?${query}`;
   return sharedRequest(
-    `security:${id}`,
+    `security:${query}`,
     async () => {
-      const response = await authenticatedFetch(`${BASE_URL}/api/Security/Get?id=${encodeURIComponent(id)}`, {
+      const response = await authenticatedFetch(url, {
         headers: { accept: "application/json" },
       });
 
